@@ -137,6 +137,10 @@ h2 { font-size: 12px; text-transform: uppercase; color: var(--accent-cyan); marg
   flex-direction: column;
   height: 100%;
   min-height: 0; /* باش المحتوى لي لداخل يدير السكرول ومايفرقعش الـ container */
+  min-width: 0;  /* الطول/العرض ديال الثلاثي (panel-left/graph-stage/panel-right) ثابت
+                    على حساب حجم الشاشة (grid + height:100%) — min-width:0 كيضمن
+                    أن أي محتوى طويل بلا فراغ (نص، تسمية عقدة...) مايكسرش هاد
+                    الحجم الثابت، هو لي كيتقص/يدير سكرول بدل مايكبر container. */
   overflow: hidden;
 }
 .panel {
@@ -510,34 +514,83 @@ body.resizing { cursor: col-resize; user-select: none; }
 .chat-msg.pending { color: var(--text-muted); font-style: italic; }
 .chat-msg.error { border-left-color: #e06b6b; color: #e06b6b; }
 
-/* ---------- Search Bar / Chat Input (شكل الكبسولة Rounded) ---------- */
-.chat-input-row { display: flex; gap: 8px; padding: 16px 18px; border-top: 1px solid var(--border); }
+/* Segment de réponse (mode général) relié à une citation exacte du texte
+   source — cliquable, ouvre le passage surligné dans le panel gauche. */
+.chat-msg .cite-mark {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--accent-cyan);
+  color: var(--text-primary);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.chat-msg .cite-mark:hover,
+.chat-msg .cite-mark:focus-visible {
+  background: rgba(111, 195, 223, 0.15);
+  color: var(--accent-cyan);
+  outline: none;
+}
+
+/* En-tête du chat quand on est en mode "concept" — petit lien pour
+   revenir au mode général (question sur le document entier). */
+#chatContextTitle { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chat-mode-reset {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.chat-mode-reset:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+/* ---------- Search Bar / Chat Input ----------
+   ديما container واحد (كبسولة موحدة) باش input وبوطونة الإرسال يبانو
+   عضو واحد ملتصق، ماشي جوج عناصر مفصولين بفراغ. ------------------- */
+.chat-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 5px 5px 5px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 24px; /* شكل الكبسولة على container كامل */
+  transition: border-color 0.15s ease;
+}
+.chat-input-row:focus-within { border-color: var(--accent-cyan); }
+
 .chat-input-row input {
-  flex: 1; 
-  background: var(--bg-primary); /* لون غامق شوية لداخل */
-  border: 1px solid var(--border); 
-  border-radius: 24px; /* شكل الكبسولة */
-  padding: 10px 16px; 
-  color: var(--text-primary); 
-  font-family: var(--font-sans); 
+  flex: 1;
+  min-width: 0;
+  background: transparent; /* بلا حدود ديالها، الكبسولة هي container */
+  border: none;
+  padding: 8px 0;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: 12.5px;
 }
+.chat-input-row input:focus { outline: none; }
 
 .chat-input-row button {
-  background: var(--accent); 
-  border: none; 
-  border-radius: 24px; 
-  padding: 8px 16px;
-  font-family: var(--font-mono); 
-  font-weight: 600; 
-  cursor: pointer; 
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  border: none;
+  border-radius: 50%; /* بوطونة مدورة ملتصقة فطرف الكبسولة */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  cursor: pointer;
   color: #14314f;
+  transition: filter 0.15s ease;
 }
-
-.chat-input-row button {
-  background: var(--accent); border: none; border-radius: 24px; padding: 8px 16px;
-  font-family: var(--font-mono); font-weight: 600; font-size: 11px; cursor: pointer; color: #14314f;
-}
+.chat-input-row button:hover { filter: brightness(1.08); }
 .chat-input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---------- Learning path list ---------- */

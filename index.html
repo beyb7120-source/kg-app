@@ -24,6 +24,9 @@
 
 <header class="topbar">
   <div class="topbar-side topbar-left">
+    <a href="dashboard.html" class="icon-btn" id="backToDashboardBtn" title="Retour au tableau de bord">
+      <i class="fa-solid fa-arrow-left"></i>
+    </a>
     <span class="brand-mark">⌗</span>
     <h1 id="graphTitle" class="graph-title" title="Cliquer pour renommer">Nouveau graphe</h1>
   </div>
@@ -64,13 +67,8 @@
 
     <button id="runBtn" class="run-btn">Lancer l'extraction</button>
 
-    <section class="block">
-      <h2>02 — Parcours</h2>
-      <button id="learningPathBtn" class="secondary-btn" disabled>🧭 Parcours conseillé</button>
-    </section>
-
     <section class="block source-result-block" id="sourceResultBlock">
-      <h2>03 — Source</h2>
+      <h2>02 — Source</h2>
       <div id="sourceResult" class="source-result">
         <p class="empty-hint">Clique sur « voir dans le texte source » pour afficher le passage ici.</p>
       </div>
@@ -81,6 +79,9 @@
 
   <section class="graph-stage">
     <div class="graph-toolbar">
+      <button id="learningPathBtn" class="icon-btn" title="Parcours conseillé" disabled>
+        <i class="fa-solid fa-route"></i>
+      </button>
       <button id="exportPdfBtn" class="icon-btn" title="Exporter en PDF" disabled>
         <i class="fa-solid fa-file-arrow-down"></i>
       </button>
@@ -111,7 +112,7 @@
       <div class="chat-messages-inline" id="chatMessages"></div>
       <div class="chat-input-row">
         <input id="chatInput" type="text" placeholder="Poser une question à l'IA..." />
-        <button id="chatSendBtn">→</button>
+        <button id="chatSendBtn" title="Envoyer"><i class="fa-solid fa-arrow-up"></i></button>
       </div>
     </div>
   </aside>

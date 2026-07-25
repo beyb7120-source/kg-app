@@ -14,7 +14,7 @@ import { render as renderGraph } from "./graphRenderer.js";
 import { getNodeRelations } from "./graphQueries.js";
 import { computeLearningPath } from "./learningPath.js";
 import { findSection, findSectionByQuote, highlightQuote } from "./sourceView.js";
-import { askAboutConcept } from "./chatClient.js";
+import { askAboutConcept, askAboutDocument } from "./chatClient.js";
 import { exportGraphToPdf } from "./graphExporter.js";
 import { initResizeHandle } from "./resizablePanels.js";
 
@@ -64,7 +64,15 @@ async function loadGraphFromDB(id) {
         // تحويل النص المخزن إلى JSON Object ديال nodes و edges
         const parsedData = JSON.parse(doc.graphData);
         currentGraphData = parsedData;
-        currentSections = null; // ماعندناش النص المصدر ديال المبيانات القديمة (غير nodes/edges)
+
+        // كنجبدو التخزين ديال النص المصدر (sections ديال stage 1) إيلا كان محفوظ.
+        // هادشي هو اللي كيخلي "aller à la source" و chat العام يخدمو حتى بعد
+        // ما نسدو ونعاودو نحلو المبيان (قبل ماكانش كيتخزن غير nodes/edges).
+        try {
+          currentSections = doc.sections ? JSON.parse(doc.sections) : null;
+        } catch {
+          currentSections = null;
+        }
 
         if (doc.title) graphTitleEl.textContent = doc.title;
 
@@ -321,7 +329,12 @@ runBtn.addEventListener("click", async () => {
           title: graphTitle,
           icon: '📄',
           sourceCount: 1,
-          graphData: JSON.stringify(currentGraphData)
+          graphData: JSON.stringify(currentGraphData),
+          // كنخزنو نص السورس (sections منظفة من stage 1) باش "aller à la
+          // source" وchat العام يبقاو خدامين حتى منين نرجعو نحلو هاد
+          // المبيان من الداشبورد. ملحوظة: خاص collection ديال Appwrite
+          // يكون فيها attribute "sections" (string, حجم كبير كفاية).
+          sections: JSON.stringify(currentSections)
         }
       );
     } catch (saveError) {
@@ -347,6 +360,14 @@ runBtn.addEventListener("click", async () => {
 function drawGraph() {
   activeLegendType = null;
   legendEl.querySelectorAll("li").forEach((el) => el.classList.remove("active"));
+
+  // إيلا ماكنا فـ mode "concept" (activeChatNode)، حدث الـ hint ديال الشات
+  // باش يبين للمستخدم واش يقدر يسول سؤال عام (خاصو currentSections).
+  if (!activeChatNode) {
+    chatContextHint.textContent = currentSections
+      ? "Pose une question sur le document entier, ou clique sur un concept dans le graphe pour une question ciblée."
+      : "Clique sur un concept dans le graphe, puis « Demander à l'IA ».";
+  }
 
   currentCy = renderGraph(currentGraphData, graphContainer, {
     confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
@@ -504,27 +525,51 @@ function showSourceInLeftPanel({ sectionId, quote }) {
 
 // ============================================================
 // Inline chat (panel droit) — "Demander à l'IA"
+//
+// Deux modes :
+//  - mode "concept" (activeChatNode défini) : question ciblée sur UN
+//    nœud précis, via askAboutConcept — comportement inchangé.
+//  - mode "général" (activeChatNode = null) : aucun concept choisi,
+//    la question porte sur le document entier. On envoie TOUTES les
+//    sections à askAboutDocument, qui répond STRICTEMENT à partir de
+//    ce texte (jamais "de sa tête") et renvoie la réponse découpée en
+//    segments, chacun optionnellement relié à une citation exacte du
+//    texte source. Chaque segment sourcé s'affiche comme un passage
+//    cliquable : un clic ouvre le passage correspondant, surligné,
+//    dans le panel gauche ("aller à la source").
 // ============================================================
 function openInlineChat(node) {
   activeChatNode = node;
-  chatContextTitle.textContent = `À propos de : ${node.label}`;
+  chatContextTitle.innerHTML = `À propos de : ${escapeHtml(node.label)} <button type="button" class="chat-mode-reset" id="chatModeReset" title="Revenir aux questions générales">✕ mode général</button>`;
+  document.getElementById("chatModeReset")?.addEventListener("click", resetChatToGeneralMode);
   chatContextHint.style.display = "none";
   chatMessages.innerHTML = "";
   chatInput.focus();
   closeNodePopup();
 }
 
+function resetChatToGeneralMode() {
+  activeChatNode = null;
+  chatContextTitle.textContent = "Assistant IA";
+  chatContextHint.style.display = "block";
+  chatContextHint.textContent = currentSections
+    ? "Pose une question sur le document entier, ou clique sur un concept dans le graphe pour une question ciblée."
+    : "Clique sur un concept dans le graphe, puis « Demander à l'IA ».";
+  chatInput.focus();
+}
+
 async function handleChat() {
   const question = chatInput.value.trim();
   if (!question) return;
 
-  if (!activeChatNode) {
-    alert("Veuillez d'abord cliquer sur un concept dans le graphe, puis « Demander à l'IA ».");
+  if (!runtimeAuth.apiKey) {
+    alert("Colle ta clé API Mistral en haut à droite d'abord.");
     return;
   }
 
-  if (!runtimeAuth.apiKey) {
-    alert("Colle ta clé API Mistral en haut à droite d'abord.");
+  const useConceptMode = !!activeChatNode;
+  if (!useConceptMode && !currentSections) {
+    alert("Lance d'abord une extraction (ou clique sur un concept dans le graphe) avant de poser une question.");
     return;
   }
 
@@ -535,15 +580,25 @@ async function handleChat() {
   const pendingEl = appendMessage("assistant pending", "Réflexion en cours...");
 
   try {
-    const section = currentSections ? findSection(currentSections, activeChatNode.sourceSectionId) : null;
-    const answer = await askAboutConcept({
-      apiKey: runtimeAuth.apiKey,
-      node: activeChatNode,
-      sectionText: section?.text,
-      question,
-    });
-    pendingEl.remove();
-    appendMessage("assistant", answer);
+    if (useConceptMode) {
+      const section = currentSections ? findSection(currentSections, activeChatNode.sourceSectionId) : null;
+      const answer = await askAboutConcept({
+        apiKey: runtimeAuth.apiKey,
+        node: activeChatNode,
+        sectionText: section?.text,
+        question,
+      });
+      pendingEl.remove();
+      appendMessage("assistant", answer);
+    } else {
+      const segments = await askAboutDocument({
+        apiKey: runtimeAuth.apiKey,
+        sections: currentSections,
+        question,
+      });
+      pendingEl.remove();
+      appendSegmentedMessage("assistant", segments);
+    }
   } catch (err) {
     pendingEl.remove();
     appendMessage("assistant error", `Erreur : ${err.message}`);
@@ -556,6 +611,44 @@ function appendMessage(cssClass, text) {
   const el = document.createElement("div");
   el.className = `chat-msg ${cssClass}`;
   el.textContent = text;
+  chatMessages.appendChild(el);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return el;
+}
+
+/**
+ * Rend une réponse "mode général" segment par segment : chaque segment
+ * sourcé (sourceQuote + sectionId) devient un <span> cliquable qui ouvre
+ * le passage correspondant, surligné, dans le panel gauche.
+ */
+function appendSegmentedMessage(cssClass, segments) {
+  const el = document.createElement("div");
+  el.className = `chat-msg ${cssClass}`;
+
+  segments.forEach((seg, i) => {
+    const hasCitation = !!(seg.sourceQuote && seg.sectionId);
+    const span = document.createElement("span");
+    span.textContent = seg.text;
+
+    if (hasCitation) {
+      span.className = "cite-mark";
+      span.title = "Cliquer pour voir le passage source";
+      span.setAttribute("role", "button");
+      span.tabIndex = 0;
+      const openSource = () => showSourceInLeftPanel({ sectionId: seg.sectionId, quote: seg.sourceQuote });
+      span.addEventListener("click", openSource);
+      span.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openSource();
+        }
+      });
+    }
+
+    el.appendChild(span);
+    if (i < segments.length - 1) el.appendChild(document.createTextNode(" "));
+  });
+
   chatMessages.appendChild(el);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   return el;
@@ -627,6 +720,11 @@ exportPdfBtn.addEventListener("click", async () => {
 // ============================================================
 initResizeHandle(document.getElementById("resizerLeft"), layoutEl, "--left-panel-width", "left", () => currentCy?.resize());
 initResizeHandle(document.getElementById("resizerRight"), layoutEl, "--right-panel-width", "right", () => currentCy?.resize());
+
+// الطول/العرض ديال panel-left / graph-stage / panel-right ثابت على حساب
+// حجم الشاشة (grid + height:100%) — بصح Cytoscape خاصو "resize()" فاش
+// كيتبدل حجم النافذة باش يعاود يحسب المساحة ديالو وما يبقاش مقصوص/فارغ.
+window.addEventListener("resize", () => currentCy?.resize());
 
 // ============================================================
 // Utils

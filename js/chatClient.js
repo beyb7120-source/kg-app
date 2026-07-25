@@ -61,3 +61,101 @@ export async function askAboutConcept({ apiKey, node, sectionText, question, onP
 
   return result.answer.trim();
 }
+
+// ============================================================
+// Général (aucun concept sélectionné) — "poser une question" sans
+// être passé par un nœud du graphe. Contrairement à askAboutConcept,
+// ce mode reçoit TOUT le texte source (sections de stage 1) et doit
+// répondre EXCLUSIVEMENT à partir de ce texte, jamais "de sa tête".
+// La réponse est découpée en segments, chacun optionnellement relié
+// à une citation exacte + un id de section, pour permettre d'afficher
+// un marqueur cliquable à côté de chaque phrase sourcée (l'utilisateur
+// clique -> le passage s'affiche en surbrillance dans le panel source).
+// ============================================================
+
+function buildDocumentSystemInstruction(sectionsText) {
+  return `
+Tu es un assistant pédagogique. Un·e étudiant·e te pose une question sur un cours. Tu as
+accès ci-dessous à L'INTÉGRALITÉ du texte source de ce cours, découpé en sections numérotées.
+
+RÈGLES STRICTES, NON NÉGOCIABLES :
+1. Réponds UNIQUEMENT à partir du texte source fourni ci-dessous. N'utilise JAMAIS tes
+   connaissances générales pour ajouter une information, un exemple ou un fait qui ne s'y
+   trouve pas explicitement.
+2. Si la réponse (ou une partie de la réponse) ne se trouve pas dans le texte source, dis-le
+   clairement plutôt que d'inventer ou de deviner.
+3. Découpe ta réponse en plusieurs segments courts dans le tableau "answer". CHAQUE segment
+   qui reprend une information du texte source DOIT avoir "sourceQuote" (un passage EXACT,
+   copié mot pour mot du texte source, une phrase ou moins) et "sectionId" (l'id de la
+   section — ex "s1" — d'où provient ce passage précis).
+4. Les segments purement transitionnels ou stylistiques (ex: "De plus,", "En résumé,",
+   "Concernant ta question,") qui ne portent aucune information factuelle peuvent avoir
+   "sourceQuote" et "sectionId" à null.
+5. Ne fusionne pas deux idées venant de sections différentes dans le même segment — un
+   segment = une seule citation source (ou aucune).
+6. Réponds dans la même langue que la question de l'étudiant·e.
+7. Sois concis et pédagogique.
+
+TEXTE SOURCE (sections) :
+${sectionsText}
+`.trim();
+}
+
+const SCHEMA_EXAMPLE_DOCUMENT = JSON.stringify(
+  {
+    answer: [
+      {
+        text: "Segment de la réponse, en texte brut.",
+        sourceQuote: "passage exact copié du texte source, ou null si non sourcé",
+        sectionId: "s1 ou null",
+      },
+    ],
+  },
+  null,
+  2
+);
+
+/** Defensive validation: drops/repairs anything malformed rather than trusting the shape blindly. */
+function validateSegments(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((seg) => seg && typeof seg.text === "string" && seg.text.trim())
+    .map((seg) => ({
+      text: seg.text.trim(),
+      sourceQuote: typeof seg.sourceQuote === "string" && seg.sourceQuote.trim() ? seg.sourceQuote.trim() : null,
+      sectionId: typeof seg.sectionId === "string" && seg.sectionId.trim() ? seg.sectionId.trim() : null,
+    }))
+    .map((seg) => (seg.sourceQuote && !seg.sectionId ? { ...seg, sourceQuote: null } : seg));
+}
+
+/**
+ * @param {Object} params
+ * @param {string} params.apiKey
+ * @param {{id:string, heading:string, text:string}[]} params.sections — full stage-1 output
+ * @param {string} params.question
+ * @param {Function} [params.onProgress]
+ * @returns {Promise<{text:string, sourceQuote:string|null, sectionId:string|null}[]>}
+ */
+export async function askAboutDocument({ apiKey, sections, question, onProgress }) {
+  if (!Array.isArray(sections) || !sections.length) {
+    throw new Error("Aucun texte source disponible pour répondre à cette question.");
+  }
+
+  const sectionsText = sections.map((s) => `### Section ${s.id} — ${s.heading}\n${s.text}`).join("\n\n");
+
+  const result = await callMistral({
+    apiKey,
+    model: MODELS.chat,
+    systemInstruction: buildDocumentSystemInstruction(sectionsText),
+    schemaExample: SCHEMA_EXAMPLE_DOCUMENT,
+    userText: question,
+    onProgress,
+  });
+
+  const segments = validateSegments(result.answer);
+  if (!segments.length) {
+    throw new Error("Réponse vide du modèle.");
+  }
+
+  return segments;
+}
