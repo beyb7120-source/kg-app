@@ -25,13 +25,12 @@ import { initResizeHandle } from "./resizablePanels.js";
 const { Client, Account, Databases, ID } = window.Appwrite;
 const client = new Client()
     .setEndpoint('https://fra.cloud.appwrite.io/v1')
-    .setProject('6a6406f5003a13231358'); 
+    .setProject('6a6406f5003a13231358');
 
 const account = new Account(client);
 const databases = new Databases(client);
 
-
-const DATABASE_ID = '6a64b2d8001b82e7f4dd'; 
+const DATABASE_ID = '6a64b2d8001b82e7f4dd';
 const COLLECTION_ID = 'userid'
 
 let currentUser = null;
@@ -42,10 +41,10 @@ const graphId = urlParams.get('graphId');
 account.get()
     .then(async (response) => {
         currentUser = response;
-        document.body.style.display = 'block'; 
+        document.body.style.display = 'block';
         document.getElementById('userNameDisplay').textContent = response.name || response.email || 'Utilisateur';
 
-        // 2. إيلا كان graphId فـ URL، جبد ديك الداتا من Appwrite ورسمها نيشان!
+        // إيلا كان graphId فـ URL، جبد ديك الداتا من Appwrite ورسمها نيشان
         if (graphId) {
             await loadGraphFromDB(graphId);
         }
@@ -57,51 +56,32 @@ account.get()
 // دالة لجلب المبيان القديم ورسمه
 async function loadGraphFromDB(id) {
     try {
-        setStage("Chargement du graphe...", "active");
         emptyState.style.display = "block";
         emptyState.textContent = "Récupération du graphe...";
 
-        const document = await databases.getDocument(
-            DATABASE_ID,
-            COLLECTION_ID,
-            id
-        );
+        const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, id);
 
         // تحويل النص المخزن إلى JSON Object ديال nodes و edges
-        const parsedData = JSON.parse(document.graphData);
+        const parsedData = JSON.parse(doc.graphData);
         currentGraphData = parsedData;
+        currentSections = null; // ماعندناش النص المصدر ديال المبيانات القديمة (غير nodes/edges)
 
-        // تفعيل الأزرار والواجهة
-        setStage(`Chargé avec succès — ${currentGraphData.nodes.length} concepts`, "done");
+        if (doc.title) graphTitleEl.textContent = doc.title;
+
         emptyState.style.display = "none";
-        thresholdSlider.disabled = false;
         learningPathBtn.disabled = false;
         exportPdfBtn.disabled = false;
         arrangeGraphBtn.disabled = false;
 
-        // رسم المبيان
         drawGraph();
-
     } catch (err) {
         console.error("Erreur chargement graphe:", err);
-        setStage("Erreur de chargement du graphe", "error");
+        emptyState.style.display = "block";
         emptyState.textContent = "Impossible de charger ce graphe.";
     }
 }
 
-// كنتأكدو واش اليوزر مكونيكطي قبل ما نخدمو التطبيق
-account.get()
-    .then((response) => {
-        // اليوزر مكونيكطي: بين ليه التطبيق
-        document.body.style.display = 'block'; 
-        document.getElementById('userNameDisplay').textContent = response.name || 'Utilisateur';
-    })
-    .catch((error) => {
-        // اليوزر مامكونيكطيش: صيفطو نيشان لـ login
-        window.location.href = 'auth/login.html';
-    });
-
-// زر تسجيل الخروج
+// زر تسجيل الخروج (icône, même fonction qu'avant)
 document.getElementById('logoutBtn').addEventListener('click', () => {
     account.deleteSession('current')
         .then(() => {
@@ -114,55 +94,86 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
 
 // ---- DOM refs ----
+const graphTitleEl = document.getElementById("graphTitle");
 const apiKeyInput = document.getElementById("apiKey");
 const dropzone = document.getElementById("dropzone");
 const pdfInput = document.getElementById("pdfInput");
 const pasteText = document.getElementById("pasteText");
 const runBtn = document.getElementById("runBtn");
-const stageLog = document.getElementById("stageLog");
 const graphContainer = document.getElementById("graphContainer");
 const emptyState = document.getElementById("emptyState");
-const detailPanel = document.getElementById("detailPanel");
-const thresholdSlider = document.getElementById("thresholdSlider");
-const thresholdValue = document.getElementById("thresholdValue");
 const legendEl = document.getElementById("legend");
 const layoutEl = document.querySelector(".layout");
 
 const learningPathBtn = document.getElementById("learningPathBtn");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
+const arrangeGraphBtn = document.getElementById("arrangeGraphBtn");
 
-const sourceDrawer = document.getElementById("sourceDrawer");
-const sourceDrawerBackdrop = document.getElementById("sourceDrawerBackdrop");
-const sourceDrawerTitle = document.getElementById("sourceDrawerTitle");
-const sourceDrawerBody = document.getElementById("sourceDrawerBody");
-const sourceDrawerClose = document.getElementById("sourceDrawerClose");
+const sourceResult = document.getElementById("sourceResult");
+const sourceResultBlock = document.getElementById("sourceResultBlock");
 
-const chatModalBackdrop = document.getElementById("chatModalBackdrop");
-const chatModalTitle = document.getElementById("chatModalTitle");
+const nodePopupBackdrop = document.getElementById("nodePopupBackdrop");
+const nodePopupBody = document.getElementById("nodePopupBody");
+const nodePopupClose = document.getElementById("nodePopupClose");
+
+const chatContextTitle = document.getElementById("chatContextTitle");
+const chatContextHint = document.getElementById("chatContextHint");
 const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
 const chatSendBtn = document.getElementById("chatSendBtn");
-const chatModalClose = document.getElementById("chatModalClose");
 
 const pathModalBackdrop = document.getElementById("pathModalBackdrop");
 const pathList = document.getElementById("pathList");
 const pathCycleNote = document.getElementById("pathCycleNote");
 const pathModalClose = document.getElementById("pathModalClose");
-const arrangeGraphBtn = document.getElementById("arrangeGraphBtn");
 
 // ---- app state ----
 let selectedFile = null;
-let currentGraphData = null;  // {nodes, edges} — stage 2 output, kept for slider/export/chat/path
+let currentGraphData = null;  // {nodes, edges} — stage 2 output, kept for export/chat/path
 let currentSections = null;   // stage 1 output — kept for "aller à la source" + chat context
 let currentCy = null;         // live Cytoscape instance — kept for export + programmatic selection
-let activeChatNode = null;    // which node the open chat modal is currently about
+let activeChatNode = null;    // which node the inline chat is currently about
 
-arrangeGraphBtn.disabled = false;
+// ============================================================
+// Titre du graphe — clic pour renommer (contenteditable)
+// ============================================================
+graphTitleEl.addEventListener("click", () => {
+  if (graphTitleEl.isContentEditable) return;
+  graphTitleEl.contentEditable = "true";
+  graphTitleEl.classList.add("editing");
+  graphTitleEl.focus();
+  document.execCommand("selectAll", false, null);
+});
 
-// --- 1. دالة ترتيب المبيان (Parcours Layout) ---
+async function commitGraphTitle() {
+  graphTitleEl.contentEditable = "false";
+  graphTitleEl.classList.remove("editing");
+  const newTitle = graphTitleEl.textContent.trim() || "Nouveau graphe";
+  graphTitleEl.textContent = newTitle;
+
+  // إيلا كان المبيان محفوظ ديجا (عندو graphId فالـ URL)، صيفط التسمية الجديدة لـ Appwrite
+  if (graphId) {
+    try {
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, graphId, { title: newTitle });
+    } catch (err) {
+      console.error("Erreur renommage:", err);
+    }
+  }
+}
+
+graphTitleEl.addEventListener("blur", commitGraphTitle);
+graphTitleEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    graphTitleEl.blur();
+  }
+});
+
+// ============================================================
+// Organiser le graphe (vue parcours)
+// ============================================================
 arrangeGraphBtn.addEventListener("click", () => {
   if (!currentCy) return;
-  // كنخدمو خوارزمية breadthfirst لي كترتب الـ nodes من الفوق لتحت بحال الشجرة
   currentCy.layout({
     name: "breadthfirst",
     directed: true,
@@ -209,18 +220,52 @@ function setSelectedFile(file) {
 // ============================================================
 legendEl.innerHTML = RELATION_TYPES.map(
   (r) => `
-  <li>
+  <li data-type="${r.key}">
     <span class="swatch" style="background:${r.color};
       border-bottom:${r.lineStyle === "dashed" ? "2px dashed" + r.color : ""}"></span>
     ${r.label}
   </li>`
 ).join("");
 
+let activeLegendType = null;
+
+legendEl.querySelectorAll("li").forEach((li) => {
+  li.addEventListener("click", () => {
+    const type = li.dataset.type;
+    activeLegendType = activeLegendType === type ? null : type;
+    legendEl.querySelectorAll("li").forEach((el) => el.classList.toggle("active", el.dataset.type === activeLegendType));
+    applyLegendFilter(activeLegendType);
+  });
+});
+
+/** Highlights nodes/edges touched by `type`'s relation and dims the rest; null clears it. */
+function applyLegendFilter(type) {
+  if (!currentCy) return;
+  currentCy.elements().removeClass("legend-dim legend-highlight");
+  if (!type) return;
+
+  const matchingEdges = currentCy.edges(`[type = "${type}"]`);
+  const touchedNodeIds = new Set();
+  matchingEdges.forEach((e) => {
+    touchedNodeIds.add(e.data("source"));
+    touchedNodeIds.add(e.data("target"));
+  });
+
+  currentCy.edges().difference(matchingEdges).addClass("legend-dim");
+  currentCy.nodes().forEach((n) => {
+    n.addClass(touchedNodeIds.has(n.id()) ? "legend-highlight" : "legend-dim");
+  });
+  matchingEdges.addClass("legend-highlight");
+}
+
 // ============================================================
-// Stage log
+// Progress feedback — plus de bloc "Pipeline" séparé, on affiche
+// juste les étapes dans emptyState (déjà visible pendant le run).
 // ============================================================
-function setStage(name, status) {
-  stageLog.innerHTML = `<li class="${status}">${name}</li>`;
+function setStage(message, status) {
+  emptyState.style.display = "block";
+  emptyState.textContent = message;
+  emptyState.classList.toggle("error", status === "error");
 }
 
 // ============================================================
@@ -237,12 +282,11 @@ runBtn.addEventListener("click", async () => {
   }
 
   runBtn.disabled = true;
-  thresholdSlider.disabled = true;
   learningPathBtn.disabled = true;
   exportPdfBtn.disabled = true;
-  emptyState.style.display = "block";
-  emptyState.textContent = "Extraction en cours...";
-  resetDetailPanel();
+  arrangeGraphBtn.disabled = true;
+  closeNodePopup();
+  setStage("Extraction en cours...", "active");
 
   try {
     const pages = selectedFile
@@ -254,20 +298,20 @@ runBtn.addEventListener("click", async () => {
       onProgress: (msg) => setStage(msg, "active"),
     };
 
-    // pipeline.execute() now returns EVERY stage's output keyed by name
-    // (not just the last one) — we need stage "extraction"'s sections
-    // later for "aller à la source" and the concept chat, alongside
-    // stage "graph"'s final {nodes, edges}. Each stage itself still only
-    // ever sees the previous stage's output, unchanged.
+    // pipeline.execute() renvoie la sortie de CHAQUE étape, indexée par
+    // nom — on a besoin des sections de l'étape "extraction" plus tard
+    // pour "aller à la source" et le chat, en plus du graphe final.
     const results = await runPipeline(pages, context);
     currentSections = results.extraction;
     currentGraphData = results.graph;
 
     try {
       setStage("Sauvegarde en cours...", "active");
-      
-      const graphTitle = selectedFile ? selectedFile.name.replace('.pdf', '') : 'Texte collé';
-      
+
+      const graphTitle = graphTitleEl.textContent.trim() ||
+        (selectedFile ? selectedFile.name.replace(/\.pdf$/i, "") : "Texte collé");
+      graphTitleEl.textContent = graphTitle;
+
       await databases.createDocument(
         DATABASE_ID,
         COLLECTION_ID,
@@ -275,95 +319,210 @@ runBtn.addEventListener("click", async () => {
         {
           userId: currentUser.$id,
           title: graphTitle,
-          icon: '📄', // يقدر يكون إيموجي افتراضي
+          icon: '📄',
           sourceCount: 1,
-          graphData: JSON.stringify(currentGraphData) // كنحولو المبيان لـ Text باش يتحفظ
+          graphData: JSON.stringify(currentGraphData)
         }
       );
-      setStage(`Terminé et sauvegardé — ${currentGraphData.nodes.length} concepts`, "done");
     } catch (saveError) {
       console.error("Erreur de sauvegarde:", saveError);
-      setStage("Terminé, mais erreur de sauvegarde", "error");
     }
-    // ----------------------------------------------------
 
-    emptyState.style.display = "none";
-    thresholdSlider.disabled = false;
     learningPathBtn.disabled = false;
     exportPdfBtn.disabled = false;
     arrangeGraphBtn.disabled = false;
 
-    drawGraph();
-
-    setStage(`Terminé — ${currentGraphData.nodes.length} concepts, ${currentGraphData.edges.length} relations`, "done");
     emptyState.style.display = "none";
-    thresholdSlider.disabled = false;
-    learningPathBtn.disabled = false;
-    exportPdfBtn.disabled = false;
-
     drawGraph();
   } catch (err) {
     setStage(err.message, "error");
-    emptyState.style.display = "block";
-    emptyState.textContent = "Une erreur est survenue — voir le détail dans le pipeline à gauche.";
   } finally {
     runBtn.disabled = false;
   }
 });
 
 // ============================================================
-// Confidence slider
+// Graph rendering
 // ============================================================
-thresholdSlider.addEventListener("input", () => {
-  thresholdValue.textContent = Number(thresholdSlider.value).toFixed(2);
-  if (currentGraphData) drawGraph();
-});
-
 function drawGraph() {
-  const threshold = Number(thresholdSlider.value) || DEFAULT_CONFIDENCE_THRESHOLD;
+  activeLegendType = null;
+  legendEl.querySelectorAll("li").forEach((el) => el.classList.remove("active"));
+
   currentCy = renderGraph(currentGraphData, graphContainer, {
-    confidenceThreshold: threshold,
+    confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
     onNodeClick: showNodeDetail,
     onEdgeClick: showEdgeDetail,
+  });
+
+  // كليك فراغ المبيان (ماشي على node/edge) كيسد الـ popup
+  currentCy.on("tap", (evt) => {
+    if (evt.target === currentCy) closeNodePopup();
   });
 }
 
 // ============================================================
-// Detail panel — node (definition + aggregated relations)
+// Detail popup — node (definition + aggregated relations)
 // ============================================================
 function showNodeDetail(node) {
-  activeChatNode = node;
   const relations = getNodeRelations(node.id, currentGraphData);
 
-  // هنا كنستهدفو غير .detail-content، الـ Chat كيبقى فبلاصتو لتحت
-  const detailContent = document.getElementById("detailPanel");
-  detailContent.innerHTML = `
-    <h2>Détails</h2>
+  nodePopupBody.innerHTML = `
     <div class="detail-card">
       <h3>${escapeHtml(node.label)}</h3>
       <p>${escapeHtml(node.definition)}</p>
       <p class="field-label">Source (section ${escapeHtml(node.sourceSectionId)})</p>
       <p class="quote">"${escapeHtml(node.sourceQuote)}"</p>
-      <span class="source-link" data-role="go-to-source">Voir dans le texte source →</span>
 
       ${renderRelationsBlock("Ce que ce concept implique / produit", relations.outgoing)}
       ${renderRelationsBlock("Ce qui mène à ce concept", relations.incoming)}
+
+      <div class="detail-actions">
+        <button data-role="ask-ai"><i class="fa-solid fa-robot"></i> Demander à l'IA</button>
+        <button data-role="go-to-source"><i class="fa-solid fa-quote-right"></i> Voir dans le texte source</button>
+      </div>
     </div>`;
 
-  detailContent
-    .querySelector('[data-role="go-to-source"]')
-    ?.addEventListener("click", () => openSourceDrawer({ sectionId: node.sourceSectionId, quote: node.sourceQuote }));
+  nodePopupBody.querySelector('[data-role="ask-ai"]')
+    ?.addEventListener("click", () => openInlineChat(node));
+
+  nodePopupBody.querySelector('[data-role="go-to-source"]')
+    ?.addEventListener("click", () => showSourceInLeftPanel({ sectionId: node.sourceSectionId, quote: node.sourceQuote }));
+
+  nodePopupBody.querySelectorAll(".chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const relatedNode = currentGraphData.nodes.find((n) => n.id === chip.dataset.nodeId);
+      if (!relatedNode) return;
+      selectNodeInGraph(relatedNode.id);
+      showNodeDetail(relatedNode);
+    });
+  });
+
+  openNodePopup();
+}
+
+/** Renders one grouped-relations section, or nothing if the node has none in that direction. */
+function renderRelationsBlock(title, groups) {
+  if (!groups.length) return "";
+  return `
+    <div class="relations-block">
+      <h4>${escapeHtml(title)}</h4>
+      ${groups
+        .map(
+          (g) => `
+        <div class="relation-group">
+          <div class="relation-type-label" style="color:${g.color}">${escapeHtml(g.label)}</div>
+          <div class="chip-list">
+            ${g.items
+              .map((item) => `<span class="chip" data-node-id="${item.node.id}">${escapeHtml(item.node.label)}</span>`)
+              .join("")}
+          </div>
+        </div>`
+        )
+        .join("")}
+    </div>`;
+}
+
+// ============================================================
+// Detail popup — edge
+// ============================================================
+function showEdgeDetail(edge) {
+  const relType = RELATION_TYPES.find((r) => r.key === edge.type);
+
+  nodePopupBody.innerHTML = `
+    <div class="detail-card">
+      <h3>${relType?.label ?? edge.type}</h3>
+      <p class="field-label">Relation</p>
+      <p>${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}</p>
+      <p class="field-label">Confiance</p>
+      <div class="confidence-bar"><div class="confidence-fill" style="width:${edge.confidence * 100}%"></div></div>
+      <p class="field-label">Source</p>
+      <p class="quote">"${escapeHtml(edge.sourceQuote)}"</p>
+
+      <div class="detail-actions">
+        <button data-role="go-to-source"><i class="fa-solid fa-quote-right"></i> Voir dans le texte source</button>
+      </div>
+    </div>`;
+
+  // Les edges n'ont pas de sourceSectionId dans le schéma actuel du graphe
+  // (seuls les nodes en ont) — showSourceInLeftPanel cherche dans toutes
+  // les sections par citation quand sectionId est absent.
+  nodePopupBody.querySelector('[data-role="go-to-source"]')
+    ?.addEventListener("click", () => showSourceInLeftPanel({ quote: edge.sourceQuote }));
+
+  openNodePopup();
+}
+
+function openNodePopup() {
+  nodePopupBackdrop.classList.add("open");
+}
+function closeNodePopup() {
+  nodePopupBackdrop.classList.remove("open");
+}
+nodePopupClose.addEventListener("click", closeNodePopup);
+nodePopupBackdrop.addEventListener("click", (e) => {
+  if (e.target === nodePopupBackdrop) closeNodePopup();
+});
+
+function selectNodeInGraph(nodeId) {
+  if (!currentCy) return;
+  currentCy.elements().unselect();
+  const ele = currentCy.$id(nodeId);
+  if (ele.length) {
+    ele.select();
+    currentCy.animate({ center: { eles: ele } }, { duration: 300 });
+  }
+}
+
+// ============================================================
+// "Aller à la source" — affiché dans le panel gauche (jamais en
+// popup ni en span : le résultat vit dans panel-left, surligné).
+// ============================================================
+function showSourceInLeftPanel({ sectionId, quote }) {
+  if (!currentSections) {
+    sourceResult.innerHTML = `<p class="empty-hint">Le texte source n'est pas disponible pour ce graphe (chargé depuis un ancien enregistrement).</p>`;
+  } else {
+    const section = sectionId
+      ? findSection(currentSections, sectionId)
+      : findSectionByQuote(currentSections, quote);
+
+    if (!section) {
+      sourceResult.innerHTML = `<p class="empty-hint">Impossible de retrouver ce passage dans le texte source.</p>`;
+    } else {
+      const { chunks } = highlightQuote(section.text, quote);
+      const body = chunks
+        .map((c) => (c.highlight ? `<mark>${escapeHtml(c.text)}</mark>` : escapeHtml(c.text)))
+        .join("");
+      sourceResult.innerHTML = `
+        <p class="source-heading">${escapeHtml(section.id)} — ${escapeHtml(section.heading)}</p>
+        ${body}`;
+    }
+  }
+
+  sourceResultBlock.scrollIntoView({ block: "start", behavior: "smooth" });
+  sourceResult.querySelector("mark")?.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+// ============================================================
+// Inline chat (panel droit) — "Demander à l'IA"
+// ============================================================
+function openInlineChat(node) {
+  activeChatNode = node;
+  chatContextTitle.textContent = `À propos de : ${node.label}`;
+  chatContextHint.style.display = "none";
+  chatMessages.innerHTML = "";
+  chatInput.focus();
+  closeNodePopup();
 }
 
 async function handleChat() {
   const question = chatInput.value.trim();
   if (!question) return;
-  
+
   if (!activeChatNode) {
-    alert("Veuillez d'abord cliquer sur un concept dans le graphe.");
+    alert("Veuillez d'abord cliquer sur un concept dans le graphe, puis « Demander à l'IA ».");
     return;
   }
-  
+
   if (!runtimeAuth.apiKey) {
     alert("Colle ta clé API Mistral en haut à droite d'abord.");
     return;
@@ -376,7 +535,7 @@ async function handleChat() {
   const pendingEl = appendMessage("assistant pending", "Réflexion en cours...");
 
   try {
-    const section = findSection(currentSections, activeChatNode.sourceSectionId);
+    const section = currentSections ? findSection(currentSections, activeChatNode.sourceSectionId) : null;
     const answer = await askAboutConcept({
       apiKey: runtimeAuth.apiKey,
       node: activeChatNode,
@@ -406,183 +565,6 @@ chatSendBtn.addEventListener("click", handleChat);
 chatInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") handleChat();
 });
-
-function appendInlineMessage(container, cssClass, text) {
-  const el = document.createElement("div");
-  el.className = `chat-msg ${cssClass}`;
-  el.textContent = text;
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
-  return el;
-}
-
-/** Renders one grouped-relations section, or nothing if the node has none in that direction. */
-function renderRelationsBlock(title, groups) {
-  if (!groups.length) return "";
-  return `
-    <div class="relations-block">
-      <h4>${escapeHtml(title)}</h4>
-      ${groups
-        .map(
-          (g) => `
-        <div class="relation-group">
-          <div class="relation-type-label" style="color:${g.color}">${escapeHtml(g.label)}</div>
-          <div class="chip-list">
-            ${g.items
-              .map((item) => `<span class="chip" data-node-id="${item.node.id}">${escapeHtml(item.node.label)}</span>`)
-              .join("")}
-          </div>
-        </div>`
-        )
-        .join("")}
-    </div>`;
-}
-
-// ============================================================
-// Detail panel — edge
-// ============================================================
-function showEdgeDetail(edge) {
-  activeChatNode = null;
-  const relType = RELATION_TYPES.find((r) => r.key === edge.type);
-  detailPanel.innerHTML = `
-    <h2>Détails</h2>
-    <div class="detail-card">
-      <h3>${relType?.label ?? edge.type}</h3>
-      <p class="field-label">Relation</p>
-      <p>${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}</p>
-      <p class="field-label">Confiance</p>
-      <div class="confidence-bar"><div class="confidence-fill" style="width:${edge.confidence * 100}%"></div></div>
-      <p class="field-label">Source</p>
-      <p class="quote">"${escapeHtml(edge.sourceQuote)}"</p>
-      <span class="source-link" data-role="go-to-source">Voir dans le texte source →</span>
-    </div>`;
-
-  // Edges don't carry a sourceSectionId in the current graph schema
-  // (only nodes do — see graphStage.js) — openSourceDrawer falls back
-  // to searching every section for the quote when sectionId is omitted.
-  detailPanel
-    .querySelector('[data-role="go-to-source"]')
-    ?.addEventListener("click", () => openSourceDrawer({ quote: edge.sourceQuote }));
-}
-
-function resetDetailPanel() {
-  detailPanel.innerHTML = `<h2>Détails</h2><p class="empty-hint">Clique sur un nœud ou une relation pour voir sa source.</p>`;
-}
-
-function selectNodeInGraph(nodeId) {
-  if (!currentCy) return;
-  currentCy.elements().unselect();
-  const ele = currentCy.$id(nodeId);
-  if (ele.length) {
-    ele.select();
-    currentCy.animate({ center: { eles: ele } }, { duration: 300 });
-  }
-}
-
-// ============================================================
-// Source drawer — "aller à la source"
-// ============================================================
-function openSourceDrawer({ sectionId, quote }) {
-  if (!currentSections) return;
-
-  const section = sectionId
-    ? findSection(currentSections, sectionId)
-    : findSectionByQuote(currentSections, quote);
-
-  if (!section) {
-    sourceDrawerTitle.textContent = "Source introuvable";
-    sourceDrawerBody.innerHTML = `<p class="empty-hint">Impossible de retrouver ce passage dans le texte source.</p>`;
-  } else {
-    sourceDrawerTitle.textContent = `${section.id} — ${section.heading}`;
-    const { chunks } = highlightQuote(section.text, quote);
-    sourceDrawerBody.innerHTML = chunks
-      .map((c) => (c.highlight ? `<mark>${escapeHtml(c.text)}</mark>` : escapeHtml(c.text)))
-      .join("");
-  }
-
-  sourceDrawer.classList.add("open");
-  sourceDrawerBackdrop.classList.add("open");
-  sourceDrawerBody.querySelector("mark")?.scrollIntoView({ block: "center", behavior: "smooth" });
-}
-
-function closeSourceDrawer() {
-  sourceDrawer.classList.remove("open");
-  sourceDrawerBackdrop.classList.remove("open");
-}
-sourceDrawerClose.addEventListener("click", closeSourceDrawer);
-sourceDrawerBackdrop.addEventListener("click", closeSourceDrawer);
-
-// ============================================================
-// Chat modal — "Demander à l'IA"
-// ============================================================
-function openChatModal(node) {
-  activeChatNode = node;
-  chatModalTitle.textContent = `À propos de : ${node.label}`;
-  chatMessages.innerHTML = "";
-  chatInput.value = "";
-  chatModalBackdrop.classList.add("open");
-  chatInput.focus();
-}
-
-function closeChatModal() {
-  chatModalBackdrop.classList.remove("open");
-}
-chatModalClose.addEventListener("click", closeChatModal);
-chatModalBackdrop.addEventListener("click", (e) => {
-  if (e.target === chatModalBackdrop) closeChatModal();
-});
-
-async function sendChatMessage() {
-  const question = chatInput.value.trim();
-  if (!question) return;
-  
-  if (!activeChatNode) {
-    alert("Veuillez d'abord cliquer sur un concept dans le graphe.");
-    return;
-  }
-  
-  if (!runtimeAuth.apiKey) {
-    alert("Colle ta clé API Mistral en haut à droite d'abord.");
-    return;
-  }
-
-  appendChatMessage("user", question);
-  chatInput.value = "";
-  chatSendBtn.disabled = true;
-
-  const pendingEl = appendChatMessage("assistant pending", "Réflexion en cours...");
-
-  try {
-    const section = findSection(currentSections, activeChatNode.sourceSectionId);
-    const answer = await askAboutConcept({
-      apiKey: runtimeAuth.apiKey,
-      node: activeChatNode,
-      sectionText: section?.text,
-      question,
-    });
-    pendingEl.remove();
-    appendChatMessage("assistant", answer);
-  } catch (err) {
-    pendingEl.remove();
-    appendChatMessage("assistant error", `Erreur : ${err.message}`);
-  } finally {
-    chatSendBtn.disabled = false;
-  }
-}
-
-chatSendBtn.addEventListener("click", sendChatMessage);
-chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendChatMessage();
-});
-
-function appendChatMessage(cssClass, text) {
-  const el = document.createElement("div");
-  el.className = `chat-msg ${cssClass}`;
-  el.textContent = text;
-  chatMessages.appendChild(el);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-  return el;
-}
 
 // ============================================================
 // Learning path modal
@@ -631,15 +613,12 @@ pathModalBackdrop.addEventListener("click", (e) => {
 exportPdfBtn.addEventListener("click", async () => {
   if (!currentCy || !currentGraphData) return;
   exportPdfBtn.disabled = true;
-  const originalLabel = exportPdfBtn.textContent;
-  exportPdfBtn.textContent = "Export...";
   try {
-    await exportGraphToPdf(currentCy, currentGraphData, { title: "Graphe de concepts" });
+    await exportGraphToPdf(currentCy, currentGraphData, { title: graphTitleEl.textContent.trim() || "Graphe de concepts" });
   } catch (err) {
     alert(`Échec de l'export PDF : ${err.message}`);
   } finally {
     exportPdfBtn.disabled = false;
-    exportPdfBtn.textContent = originalLabel;
   }
 });
 

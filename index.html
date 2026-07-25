@@ -3,11 +3,17 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Graphe de concepts — extraction assistée</title>
+<title>Constella</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
+<!-- كنخدمو غير نسخة وحدة ديال pdf.js (4.0.379) -->
+<!-- كانت مزوجة مع نسخة 3.4.120 فآخر الصفحة، وهاد التعارض
+     ديال الفرجونات هو لي كان كيخلي الـ worker مايقدرش يطلع
+     ("Setting up fake worker failed") حيت workerSrc ديال app.js
+     كان مشير ل4.0.379 ملي pdfjsLib الفعلي كان ولى 3.4.120. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -18,24 +24,28 @@
 <body style="display: none;"> <!-- درنا display: none باش مايبان التطبيق حتى نتأكدو واش مكونيكطي -->
 
 <header class="topbar">
-  <div class="brand">
+  <div class="topbar-side topbar-left">
     <span class="brand-mark">⌗</span>
-    <div>
-      <h1>Graphe de concepts</h1>
-      <p class="subtitle">extraction assistée — lecture → concepts → relations</p>
-    </div>
+    <h1 id="graphTitle" class="graph-title" title="Cliquer pour renommer">Nouveau graphe</h1>
   </div>
-  
-  <div style="display: flex; align-items: center; gap: 15px;">
-      <div class="key-field">
-        <label for="apiKey">Clé API Mistral (La Plateforme)</label>
-        <input id="apiKey" type="password" placeholder="colle ta clé ici" autocomplete="off" />
-      </div>
-      
-      <div class="user-info" style="display: flex; flex-direction: column; align-items: flex-end;">
-          <span id="userNameDisplay" style="font-size: 0.85rem; color: #333; font-weight: 600;">Loading...</span>
-          <button id="logoutBtn" style="background: #e53935; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; margin-top: 4px;">Déconnexion</button>
-      </div>
+
+  <div class="topbar-center">
+    <span class="app-name">Constella</span>
+  </div>
+
+  <div class="topbar-side topbar-right">
+    <div class="key-field">
+      <label for="apiKey">Clé API Mistral</label>
+      <input id="apiKey" type="password" placeholder="colle ta clé ici" autocomplete="off" />
+    </div>
+
+    <div class="user-info">
+      <span id="userNameDisplay">Loading...</span>
+    </div>
+
+    <button id="logoutBtn" class="icon-btn logout-btn" title="Déconnexion">
+      <i class="fa-solid fa-arrow-right-from-bracket"></i>
+    </button>
   </div>
 </header>
 
@@ -55,33 +65,16 @@
 
     <button id="runBtn" class="run-btn">Lancer l'extraction</button>
 
-    <section class="block log-block">
-      <h2>02 — Pipeline</h2>
-      <ol id="stageLog" class="stage-log">
-        <li data-stage="idle" class="active">en attente</li>
-      </ol>
+    <section class="block">
+      <h2>02 — Parcours</h2>
+      <button id="learningPathBtn" class="secondary-btn" disabled>🧭 Parcours conseillé</button>
     </section>
 
-    <section class="block">
-      <h2>03 — Filtre</h2>
-      <label class="slider-label">
-        Confiance minimale : <span id="thresholdValue">0.60</span>
-      </label>
-      <input type="range" id="thresholdSlider" min="0" max="1" step="0.05" value="0.6" disabled />
-    </section>
-
-    <section class="block">
-      <h2>04 — Parcours</h2>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button id="learningPathBtn" class="secondary-btn" disabled>🧭 Liste: Parcours conseillé</button>
-        <!-- الزر الجديد لي غادي يرتب المبيان -->
-        <button id="arrangeGraphBtn" class="secondary-btn" disabled>📐 Organiser le graphe (Vue Parcours)</button>
+    <section class="block source-result-block" id="sourceResultBlock">
+      <h2>03 — Source</h2>
+      <div id="sourceResult" class="source-result">
+        <p class="empty-hint">Clique sur « voir dans le texte source » pour afficher le passage ici.</p>
       </div>
-    </section>
-
-    <section class="block legend-block">
-      <h2>Légende des relations</h2>
-      <ul id="legend" class="legend"></ul>
     </section>
   </aside>
 
@@ -89,24 +82,33 @@
 
   <section class="graph-stage">
     <div class="graph-toolbar">
-      <button id="exportPdfBtn" disabled>⬇ Exporter PDF</button>
+      <button id="exportPdfBtn" class="icon-btn" title="Exporter en PDF" disabled>
+        <i class="fa-solid fa-file-arrow-down"></i>
+      </button>
     </div>
+
+    <ul id="legend" class="legend legend-overlay"></ul>
+
     <div id="graphContainer" class="graph-canvas"></div>
     <p id="emptyState" class="empty-state">
       Le graphe apparaîtra ici après extraction.
     </p>
+
+    <!-- ---------- Node / edge detail popup (au-dessus du graphe) ---------- -->
+    <div class="node-popup-backdrop" id="nodePopupBackdrop">
+      <div class="node-popup" id="nodePopup">
+        <button class="modal-close" id="nodePopupClose">✕</button>
+        <div id="nodePopupBody"></div>
+      </div>
+    </div>
   </section>
 
   <div class="resizer" id="resizerRight" title="Glisser pour redimensionner"></div>
 
   <aside class="panel panel-right" id="rightPanelWrapper">
-    <div id="detailPanel" class="detail-content">
-      <h2>Détails</h2>
-      <p class="empty-hint">Clique sur un nœud ou une relation pour voir sa source.</p>
-    </div>
-    
-    <!-- الـ Chatbot غيبقى ديما شاد بلاصتو لتحت -->
     <div class="inline-chat-container">
+      <h2 id="chatContextTitle">Assistant IA</h2>
+      <p class="chat-context-hint" id="chatContextHint">Clique sur un concept dans le graphe, puis « Demander à l'IA ».</p>
       <div class="chat-messages-inline" id="chatMessages"></div>
       <div class="chat-input-row">
         <input id="chatInput" type="text" placeholder="Poser une question à l'IA..." />
@@ -117,37 +119,17 @@
 
 </main>
 
-<!-- ---------- Source drawer : "aller à la source" ---------- -->
-<div class="drawer-backdrop" id="sourceDrawerBackdrop"></div>
-<aside class="source-drawer" id="sourceDrawer">
-  <div class="source-drawer-header">
-    <h3 id="sourceDrawerTitle">Source</h3>
-    <button class="modal-close" id="sourceDrawerClose">✕</button>
-  </div>
-  <div class="source-drawer-body" id="sourceDrawerBody"></div>
-</aside>
-
-<!-- ---------- Chat modal : "demander à l'IA" ---------- -->
-<div class="modal-backdrop" id="chatModalBackdrop">
-  <div class="modal">
-    <div class="modal-header">
-      <h2 id="chatModalTitle">Demander à l'IA</h2>
-      <button class="modal-close" id="chatModalClose">✕</button>
-    </div>
-    <div class="modal-body" id="chatMessages"></div>
-    <div class="chat-input-row">
-      <input id="chatInput" type="text" placeholder="Pose ta question sur ce concept..." />
-      <button id="chatSendBtn">Envoyer</button>
-    </div>
-  </div>
-</div>
-
 <!-- ---------- Learning path modal ---------- -->
 <div class="modal-backdrop" id="pathModalBackdrop">
   <div class="modal">
     <div class="modal-header">
       <h2>Parcours d'apprentissage conseillé</h2>
-      <button class="modal-close" id="pathModalClose">✕</button>
+      <div class="modal-header-actions">
+        <button id="arrangeGraphBtn" class="icon-btn" title="Organiser le graphe (vue parcours)" disabled>
+          <i class="fa-solid fa-diagram-project"></i>
+        </button>
+        <button class="modal-close" id="pathModalClose">✕</button>
+      </div>
     </div>
     <div class="modal-body">
       <p class="empty-hint">Basé sur les relations « prérequis de » du graphe — ordre calculé localement, sans appel API supplémentaire.</p>
@@ -157,7 +139,6 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 <script type="module" src="js/app.js"></script>
 </body>
 </html>
