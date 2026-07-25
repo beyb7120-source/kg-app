@@ -91,7 +91,7 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 
 /* global pdfjsLib */
 pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
 
 // ---- DOM refs ----
 const graphTitleEl = document.getElementById("graphTitle");
