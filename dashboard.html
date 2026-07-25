@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tableau de bord — Constella</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+  
+  <!-- كنستعملو نفس الستايل الأصلي باش نحافظو على الألوان -->
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/dashboard.css" />
+</head>
+<body>
+
+  <!-- النافذة العلوية (Header) خفيفة -->
+  <header class="dashboard-header">
+    <div class="brand">
+      <span class="brand-mark">⌗</span>
+      <h1>Constella</h1>
+    </div>
+    <div class="user-profile">
+      <span id="userName">Chargement...</span>
+      <button id="logoutBtn" class="logout-btn">Déconnexion</button>
+    </div>
+  </header>
+
+  <main class="dashboard-main">
+    <h2 class="section-title">Recent graphs</h2>
+    
+    <div class="graphs-grid" id="graphsGrid">
+      
+      <!-- الكارد ديال إنشاء مبيان جديد (دائما كاينة) -->
+      <div class="graph-card create-card" id="createNewGraphBtn">
+        <div class="create-icon">+</div>
+        <p>Create new graph</p>
+      </div>
+
+      <!-- هنا غيتحطو المبيانات القدام بالـ JS -->
+      <!-- مثال كيفاش غيبانو (غيمسحو JS ويعوضهم بالداطا الحقيقية) -->
+      <div class="graph-card" style="display: none;">
+        <div class="card-header">
+          <span class="card-icon">⚔️</span>
+          <button class="card-options">⋮</button>
+        </div>
+        <div class="card-info">
+          <h3>Al-Andalus y la Reconquista: ...</h3>
+          <p>19 Mar 2026 • 1 source</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script type="module" src="../js/dashboard.js"></script>
+</body>
+</html>

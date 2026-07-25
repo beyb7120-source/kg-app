@@ -1,0 +1,69 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+</head>
+<body>
+    <script>
+        const { Client, Account } = Appwrite;
+        
+        const client = new Client()
+            .setEndpoint('https://fra.cloud.appwrite.io/v1')
+            .setProject('6a6406f5003a13231358');
+            
+        const account = new Account(client);
+
+        // كنجبدو المعلومات من الرابط
+        const urlParams = new URLSearchParams(window.location.search);
+        const secret = urlParams.get('secret');
+        const userId = urlParams.get('userId');
+
+        if (userId && secret) {
+            // كنكرييو الجلسة وكندوزو للصفحة الرئيسية عاد كنسدو النافذة
+            account.createSession(userId, secret).then(() => {
+                window.opener.location.href = '../index.html'; // التوجيه للصفحة الرئيسية
+                window.close(); 
+            }).catch(() => {
+                window.close();
+            });
+        } else {
+            window.close();
+        }
+    </script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+</head>
+<body>
+    <script>
+        const { Client, Account } = Appwrite;
+        
+        const client = new Client()
+            .setEndpoint('https://fra.cloud.appwrite.io/v1')
+            .setProject('6a6406f5003a13231358');
+            
+        const account = new Account(client);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const secret = urlParams.get('secret');
+        const userId = urlParams.get('userId');
+
+        if (userId && secret) {
+            account.createSession(userId, secret).then(() => {
+                // التغيير كاين هنا: غنوجهوه للداشبورد بلاصت الاندكس
+                window.opener.location.href = '../dashboard.html'; 
+                window.close(); 
+            }).catch(() => {
+                window.close();
+            });
+        } else {
+            window.close();
+        }
+    </script>
+</body>
+</html>

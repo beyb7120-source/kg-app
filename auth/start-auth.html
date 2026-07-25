@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
+</head>
+<body>
+    <script>
+        const { Client, Account } = Appwrite;
+        
+        const client = new Client()
+            .setEndpoint('https://fra.cloud.appwrite.io/v1')
+            .setProject('6a6406f5003a13231358');
+            
+        const account = new Account(client);
+
+        // هاد الكود دابا غيتنفذ وسط النافذة الصغيرة، وغيوجهها لجوجل
+        account.createOAuth2Token(
+    'google',
+    'http://localhost:8000/auth/popup-success.html', // رابط النجاح
+    'http://localhost:8000/auth/login.html'          // رابط الفشل
+);
+    </script>
+</body>
+</html>
