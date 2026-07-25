@@ -137,7 +137,7 @@ h2 { font-size: 12px; text-transform: uppercase; color: var(--accent-cyan); marg
   flex-direction: column;
   height: 100%;
   min-height: 0; /* باش المحتوى لي لداخل يدير السكرول ومايفرقعش الـ container */
-  min-width: 0;  /* الطول/العرض ديال الثلاثي (panel-left/graph-stage/panel-right) ثابت
+   /* الطول/العرض ديال الثلاثي (panel-left/graph-stage/panel-right) ثابت
                     على حساب حجم الشاشة (grid + height:100%) — min-width:0 كيضمن
                     أن أي محتوى طويل بلا فراغ (نص، تسمية عقدة...) مايكسرش هاد
                     الحجم الثابت، هو لي كيتقص/يدير سكرول بدل مايكبر container. */
