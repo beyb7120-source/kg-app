@@ -45,13 +45,13 @@ const graphId = urlParams.get('graphId');
 let currentDbId = graphId;
 // ... الكود اللي الفوق
 
-
 // هادو كيجيو من الإيميل ديال Appwrite
 const teamIdParam = urlParams.get('teamId');
 const membershipIdParam = urlParams.get('membershipId');
 const userIdParam = urlParams.get('userId');
 const secretParam = urlParams.get('secret');
 
+// بلوك واحد نقي للتحقق من الدخول وقبول الدعوة
 account.get()
     .then(async (response) => {
         currentUser = response;
@@ -65,7 +65,7 @@ account.get()
                 await teams.updateMembershipStatus(teamIdParam, membershipIdParam, userIdParam, secretParam);
                 alert("Vous avez rejoint l'équipe de ce graphe avec succès !");
                 
-                // مسح ديك الروينة من الرابط باش يبقى نقي
+                // مسح ديك الروينة من الرابط
                 window.history.replaceState({}, document.title, window.location.pathname + "?graphId=" + graphId);
             } catch (err) {
                 console.error("Erreur d'acceptation de l'invitation:", err);
@@ -79,26 +79,15 @@ account.get()
         }
     })
     .catch((error) => {
-        // إيلا كليكا على الرابط وهو مامكونيكطيش، نديوه لصفحة الدخول
-        window.location.href = 'auth/login.html';
-    });
-
-// تأكد واش مكونيكطي واحتفظ باليوزر باش نربطو بيه المبيان
-account.get()
-    .then(async (response) => {
-        currentUser = response;
-        document.body.style.display = 'block';
-        document.getElementById('userNameDisplay').textContent = response.name || response.email || 'Utilisateur';
-
-        // إيلا كان graphId فـ URL، جبد ديك الداتا من Appwrite ورسمها نيشان
-        if (graphId) {
-            await loadGraphFromDB(graphId);
+        // إيلا جا من الإيميل ومامكونيكطيش، نحفظو الرابط ديالو
+        if (teamIdParam) {
+            localStorage.setItem('pendingInviteUrl', window.location.href);
         }
-    })
-    .catch((error) => {
+        // عاد نصيفطوه يتكونيكطا
         window.location.href = 'auth/login.html';
     });
 
+// دالة لجلب المبيان القديم ورسمه
 // دالة لجلب المبيان القديم ورسمه
 async function loadGraphFromDB(id) {
     try {
@@ -107,15 +96,8 @@ async function loadGraphFromDB(id) {
 
         const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, id);
 
-        // Ownership check côté client — la vraie protection reste les
-        // permissions Appwrite (collection/document level), mais ce
-        // garde-fou évite qu'un $id deviné/partagé n'affiche un graphe
-        // d'un autre compte dans CETTE session déjà authentifiée.
-        if (doc.userId && doc.userId !== currentUser.$id) {
-          showToast("Ce graphe ne t'appartient pas.", "error");
-          window.location.href = "dashboard.html";
-          return;
-        }
+        // حيدنا داك ownership check حيت Appwrite Permissions (Teams) هوما اللي كيحميو المبيان دابا.
+        // إيلا Appwrite خلاه يوصل لهاد السطر، راه يعني عندو الحق يشوفو.
 
         currentDbId = id;
         currentSourceCount = doc.sourceCount || 1;
@@ -124,9 +106,6 @@ async function loadGraphFromDB(id) {
         const parsedData = JSON.parse(doc.graphData);
         currentGraphData = parsedData;
 
-        // كنجبدو التخزين ديال النص المصدر (sections ديال stage 1) إيلا كان محفوظ.
-        // هادشي هو اللي كيخلي "aller à la source" و chat العام يخدمو حتى بعد
-        // ما نسدو ونعاودو نحلو المبيان (قبل ماكانش كيتخزن غير nodes/edges).
         try {
           currentSections = doc.sections ? JSON.parse(doc.sections) : null;
         } catch {
@@ -145,7 +124,7 @@ async function loadGraphFromDB(id) {
         drawGraph();
     } catch (err) {
         console.error("Erreur chargement graphe:", err);
-        showToast("Impossible de charger ce graphe.", "error");
+        showToast("Impossible de charger ce graphe. Vous n'avez peut-être pas les droits.", "error");
         emptyState.style.display = "block";
         emptyState.textContent = "Impossible de charger ce graphe.";
     }

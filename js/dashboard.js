@@ -17,6 +17,12 @@ const PAGE_SIZE = 12;
 // Emojis مقترحين للكارد — بلا اعتماد على input نص حر (أبسط وأسرع UX).
 const ICON_CHOICES = ["📄", "📘", "📙", "📗", "🧠", "⚔️", "🧬", "🔬", "🌍", "📐", "⚙️", "💡"];
 
+// التحقق واش المستخدم يالاه جا من دعوة ديال شي مبيان
+const pendingInvite = localStorage.getItem('pendingInviteUrl');
+if (pendingInvite) {
+    localStorage.removeItem('pendingInviteUrl'); // نمسحوها باش ماتبقاش لاصقة
+    window.location.href = pendingInvite; // نرجعوه نيشان يقبل الدعوة ويشوف المبيان
+}
 const userNameEl = document.getElementById('userName');
 const logoutBtn = document.getElementById('logoutBtn');
 const graphsGrid = document.getElementById('graphsGrid');
