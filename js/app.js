@@ -1342,13 +1342,13 @@ confirmShareBtn.addEventListener("click", async () => {
 
         // التعديل كاين هنا: زدنا undefined ديال userId باش الترتيب يتقاد
         await teams.createMembership(
-            targetTeamId,     // 1. teamId (الآيدي ديال الفريق)
-            [],               // 2. roles (الأدوار، خاوية حيت فرقنا الفرق)
-            email,            // 3. email (الإيميل ديال المدعو)
-            undefined,        // 4. userId (ما عندناش الآيدي، غنصيفطو غير بالإيميل)
-            undefined,        // 5. phone (ما بغيناش نمرة التليفون، خليها خاوية)
-            redirectUrl,      // 6. url (الرابط ديال المبيان)
-            ""                // 7. name (السمية، خاوية)
+            targetTeamId,     // 1. teamId
+            [],               // 2. roles
+            email,            // 3. email
+            undefined,        // 4. userId
+            undefined,        // 5. phone
+            redirectUrl,      // 6. url
+            undefined         // 7. name (خليناها undefined باش مايحسبهاش خاوية)
         );
 
         shareStatusMsg.style.color = "#8fbf7f"; 
