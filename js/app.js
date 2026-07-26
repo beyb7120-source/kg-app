@@ -1288,15 +1288,16 @@ shareModalBackdrop.addEventListener("click", (e) => {
     if (e.target === shareModalBackdrop) closeShareModal();
 });
 
+
 // ============================================================
-// Logique de Partage (Appwrite Teams & Permissions) - VERSION CORRIGÉE
+// Logique de Partage (Appwrite Teams & Permissions) - CORRIGÉ
 // ============================================================
 const confirmShareBtn = document.getElementById("confirmShareBtn");
 const shareStatusMsg = document.getElementById("shareStatusMsg");
 
 confirmShareBtn.addEventListener("click", async () => {
     const email = document.getElementById("shareEmail").value.trim();
-    const role = document.getElementById("shareRole").value; // 'viewer' أو 'editor'
+    const role = document.getElementById("shareRole").value; 
     
     const urlParams = new URLSearchParams(window.location.search);
     const currentGraphId = urlParams.get('graphId');
@@ -1312,54 +1313,44 @@ confirmShareBtn.addEventListener("click", async () => {
     confirmShareBtn.disabled = true;
 
     try {
-        // 1. غنصاوبو جوج فراقي باش نتفاداو مشكل الصلاحيات ديال Appwrite
         const viewerTeamId = "v_" + currentGraphId;
         const editorTeamId = "e_" + currentGraphId;
 
-        // نأكدو بلي فريق المشاهدة كاين (ولا نكرييوه)
-        try { 
-            await teams.get(viewerTeamId); 
-        } catch (e) { 
-            await teams.create(viewerTeamId, "Viewers - Graphe: " + currentGraphId); 
-        }
+        try { await teams.get(viewerTeamId); } 
+        catch (e) { await teams.create(viewerTeamId, "Viewers - Graphe: " + currentGraphId); }
 
-        // نأكدو بلي فريق التعديل كاين (ولا نكرييوه)
-        try { 
-            await teams.get(editorTeamId); 
-        } catch (e) { 
-            await teams.create(editorTeamId, "Editors - Graphe: " + currentGraphId); 
-        }
+        try { await teams.get(editorTeamId); } 
+        catch (e) { await teams.create(editorTeamId, "Editors - Graphe: " + currentGraphId); }
 
-        // 2. نعدلو صلاحيات المبيان باش يقبل هاد الجوج فراقي
         await databases.updateDocument(
             DATABASE_ID, 
             COLLECTION_ID, 
             currentGraphId, 
-            undefined, // ماغنبدلوش الداتا، غنبدلو غير الصلاحيات
+            undefined, 
             [
                 Permission.read(Role.user(currentUser.$id)),
                 Permission.update(Role.user(currentUser.$id)),
                 Permission.delete(Role.user(currentUser.$id)),
-                Permission.read(Role.team(viewerTeamId)),  // فريق Viewers يقرا فقط
-                Permission.read(Role.team(editorTeamId)),  // فريق Editors يقرا
-                Permission.update(Role.team(editorTeamId)) // فريق Editors يعدل
+                Permission.read(Role.team(viewerTeamId)),  
+                Permission.read(Role.team(editorTeamId)),  
+                Permission.update(Role.team(editorTeamId)) 
             ]
         );
 
-        // 3. نصيفطو الدعوة للإيميل على حساب الفريق اللي ختار اليوزر
         const redirectUrl = window.location.origin + '/index.html?graphId=' + currentGraphId;
         const targetTeamId = role === 'viewer' ? viewerTeamId : editorTeamId;
 
+        // التعديل كاين هنا: زدنا undefined ديال userId باش الترتيب يتقاد
         await teams.createMembership(
-            targetTeamId,
-            [], // خليناها خاوية حيت عزلنا الأدوار ففراقي مستقلة
-            email,
-            undefined,
-            redirectUrl,
-            ""
+            targetTeamId,     // 1. teamId (الآيدي ديال الفريق)
+            [],               // 2. roles (الأدوار، خاوية حيت فرقنا الفرق)
+            email,            // 3. email (الإيميل ديال المدعو)
+            undefined,        // 4. userId (ما عندناش الآيدي، غنصيفطو غير بالإيميل)
+            undefined,        // 5. phone (ما بغيناش نمرة التليفون، خليها خاوية)
+            redirectUrl,      // 6. url (الرابط ديال المبيان)
+            ""                // 7. name (السمية، خاوية)
         );
 
-        // ميساج النجاح
         shareStatusMsg.style.color = "#8fbf7f"; 
         shareStatusMsg.textContent = `Invitation envoyée avec succès à ${email} en tant que ${role} !`;
         document.getElementById("shareEmail").value = "";
