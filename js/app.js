@@ -1226,3 +1226,25 @@ function escapeHtml(str) {
   div.textContent = str ?? "";
   return div.innerHTML;
 }
+
+// ============================================================
+// Share Modal Logic (UI Toggle)
+// ============================================================
+const shareModalBackdrop = document.getElementById("shareModalBackdrop");
+const openShareModalBtn = document.getElementById("openShareModalBtn");
+const shareModalClose = document.getElementById("shareModalClose");
+
+openShareModalBtn.addEventListener("click", () => {
+    shareModalBackdrop.classList.add("open");
+});
+
+function closeShareModal() {
+    shareModalBackdrop.classList.remove("open");
+    document.getElementById("shareStatusMsg").style.display = "none";
+    document.getElementById("shareEmail").value = "";
+}
+
+shareModalClose.addEventListener("click", closeShareModal);
+shareModalBackdrop.addEventListener("click", (e) => {
+    if (e.target === shareModalBackdrop) closeShareModal();
+});
