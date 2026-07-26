@@ -295,3 +295,90 @@ body {
   color: var(--text-muted);
   margin: 0;
 }
+
+/* ============================================================
+   Toolbar ديال الداشبورد — بحث + (لاحقًا: فلاتر أخرى)
+   ============================================================ */
+.dashboard-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.search-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 340px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+.search-input:focus { outline: none; border-color: var(--accent-cyan); }
+.dashboard-empty-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  padding: 40px 0;
+  text-align: center;
+  grid-column: 1 / -1;
+}
+
+.load-more-wrap { display: flex; justify-content: center; margin-top: 24px; }
+.load-more-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--accent-cyan);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.load-more-btn:hover { border-color: var(--accent-cyan); }
+.load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ============================================================
+   Icon picker — popover بسيط ديال اختيار إيموجي للكارد
+   ============================================================ */
+.icon-picker {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  display: none;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  padding: 8px;
+  z-index: 25;
+}
+.icon-picker.show { display: grid; }
+.icon-picker button {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 6px;
+  line-height: 1;
+}
+.icon-picker button:hover { background: rgba(255, 255, 255, 0.08); }
+
+/* Bouton "changer d'icône" dans le header de la carte */
+.card-icon-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  position: relative;
+}

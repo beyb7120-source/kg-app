@@ -41,6 +41,14 @@ export function render(graphData, container, opts) {
     style: buildStylesheet(),
     layout: { name: "cose", animate: true, animationDuration: 400, padding: 40 },
     wheelSensitivity: 0.25,
+    // Cytoscape gère le pan/pinch-to-zoom tactile nativement (pas besoin
+    // de lib externe) — on le rend explicite + on borne le zoom pour que
+    // le graphe reste manipulable sur petit écran (mobile/tablette).
+    userZoomingEnabled: true,
+    userPanningEnabled: true,
+    boxSelectionEnabled: false,
+    minZoom: 0.2,
+    maxZoom: 3,
   });
 
   cy.on("tap", "node", (evt) => opts.onNodeClick(evt.target.data()));
@@ -55,7 +63,7 @@ export function render(graphData, container, opts) {
 
 /** Re-filter an already-rendered graph without re-running layout from scratch. */
 export function updateThreshold(graphData, confidenceThreshold, container, opts) {
-  render(graphData, container, { ...opts, confidenceThreshold });
+  return render(graphData, container, { ...opts, confidenceThreshold });
 }
 
 function buildStylesheet() {

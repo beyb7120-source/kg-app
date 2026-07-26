@@ -137,7 +137,7 @@ h2 { font-size: 12px; text-transform: uppercase; color: var(--accent-cyan); marg
   flex-direction: column;
   height: 100%;
   min-height: 0; /* باش المحتوى لي لداخل يدير السكرول ومايفرقعش الـ container */
-   /* الطول/العرض ديال الثلاثي (panel-left/graph-stage/panel-right) ثابت
+  min-width: 0;  /* الطول/العرض ديال الثلاثي (panel-left/graph-stage/panel-right) ثابت
                     على حساب حجم الشاشة (grid + height:100%) — min-width:0 كيضمن
                     أن أي محتوى طويل بلا فراغ (نص، تسمية عقدة...) مايكسرش هاد
                     الحجم الثابت، هو لي كيتقص/يدير سكرول بدل مايكبر container. */
@@ -385,9 +385,10 @@ body.resizing { cursor: col-resize; user-select: none; }
   text-underline-offset: 2px;
 }
 
-.detail-actions { display: flex; gap: 8px; margin-top: 16px; }
+.detail-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .detail-actions button {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 120px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   color: var(--text-primary);
@@ -399,6 +400,8 @@ body.resizing { cursor: col-resize; user-select: none; }
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 .detail-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.detail-actions button.danger-action { color: #e06b6b; border-color: rgba(224,107,107,0.4); }
+.detail-actions button.danger-action:hover { border-color: #e06b6b; color: #e06b6b; }
 
 /* ============================================================
    Source result — "aller à la source" (affiché dans panel-left)
@@ -610,3 +613,159 @@ body.resizing { cursor: col-resize; user-select: none; }
 .learning-path-cycle-note {
   color: #e0b86b; font-size: 11px; margin-top: 12px; font-family: var(--font-mono); line-height: 1.6;
 }
+
+/* ============================================================
+   THEME — light mode (toggle via body.theme-light). Tous les
+   composants existants lisent les mêmes CSS vars, donc rien
+   d'autre à changer ailleurs : il suffit d'overrider les vars ici.
+   ============================================================ */
+body.theme-light {
+  --bg-primary: #eef3f8;
+  --bg-panel: #ffffff;
+  --bg-panel-raised: #f5f8fb;
+  --grid-line: rgba(20, 49, 79, 0.05);
+  --text-primary: #14314f;
+  --text-muted: #5c7290;
+  --border: #d7e1ec;
+}
+body.theme-light .graph-toolbar .icon-btn,
+body.theme-light .legend-overlay,
+body.theme-light .confidence-control { background: rgba(255, 255, 255, 0.9); }
+body.theme-light .topbar { background: rgba(238, 243, 248, 0.9); }
+body.theme-light .run-btn,
+body.theme-light .chat-input-row button { color: #ffffff; }
+
+/* ============================================================
+   Toast notifications — feedback visible pour toute action qui
+   échoue silencieusement avant (pin/rename/delete/save auto...).
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 320px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-cyan);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: toast-in 0.2s ease;
+  pointer-events: auto;
+}
+.toast.error { border-left-color: #e06b6b; }
+.toast.success { border-left-color: #8fbf7f; }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Confidence threshold control (filtre visuel des relations)
+   ============================================================ */
+.confidence-control {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  background: rgba(18, 50, 82, 0.85);
+  backdrop-filter: blur(4px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.confidence-control input[type="range"] { width: 100px; accent-color: var(--accent-cyan); }
+.confidence-control .confidence-value { color: var(--text-primary); min-width: 30px; text-align: right; }
+
+/* ============================================================
+   Merge toggle (ajouter une source à un graphe existant) +
+   remember-key checkbox — petites options à cocher, style unifié.
+   ============================================================ */
+.inline-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin: 8px 0 14px;
+  cursor: pointer;
+}
+.inline-checkbox input { accent-color: var(--accent-cyan); cursor: pointer; }
+.key-field .inline-checkbox { margin: 6px 0 0; justify-content: flex-end; }
+
+/* ============================================================
+   Detail card — édition inline (label/définition d'un nœud,
+   type/suppression d'une relation) + formulaire "ajouter une
+   relation". Réutilise le style des .detail-actions button.
+   ============================================================ */
+.edit-field {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  padding: 8px;
+  margin-top: 4px;
+  resize: vertical;
+}
+.edit-field:focus { outline: none; border-color: var(--accent-cyan); }
+.edit-actions-row { display: flex; gap: 8px; margin-top: 10px; }
+.edit-actions-row button {
+  flex: 1;
+  border-radius: 8px;
+  padding: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+}
+.edit-actions-row button.primary { background: var(--accent); color: #14314f; border-color: var(--accent); font-weight: 600; }
+.edit-actions-row button.danger { color: #e06b6b; border-color: #e06b6b; background: rgba(224,107,107,0.08); }
+
+.add-relation-form { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.add-relation-form label { font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: var(--text-muted); }
+.add-relation-form select,
+.add-relation-form input {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  padding: 8px;
+}
+
+/* ============================================================
+   Stats panel (nœuds/relations/confiance moyenne, répartition
+   par type) — modal réutilisant .modal-backdrop/.modal.
+   ============================================================ */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat-box { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.stat-box .stat-value { font-family: var(--font-mono); font-size: 20px; color: var(--accent); }
+.stat-box .stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-top: 4px; }
+.stats-breakdown-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.stats-breakdown-row:last-child { border-bottom: none; }

@@ -7,16 +7,17 @@
 // events to those modules' functions and passes data through.
 // ============================================================
 
-import { runtimeAuth, RELATION_TYPES, DEFAULT_CONFIDENCE_THRESHOLD } from "./config.js";
+import { runtimeAuth, RELATION_TYPES, RELATION_KEYS, DEFAULT_CONFIDENCE_THRESHOLD } from "./config.js";
 import { extractPdfPages, wrapPastedText } from "./pdfReader.js";
 import { execute as runPipeline } from "./pipeline.js";
-import { render as renderGraph } from "./graphRenderer.js";
+import { render as renderGraph, updateThreshold } from "./graphRenderer.js";
 import { getNodeRelations } from "./graphQueries.js";
 import { computeLearningPath } from "./learningPath.js";
 import { findSection, findSectionByQuote, highlightQuote } from "./sourceView.js";
 import { askAboutConcept, askAboutDocument } from "./chatClient.js";
-import { exportGraphToPdf } from "./graphExporter.js";
+import { exportGraphToPdf, exportGraphToJson } from "./graphExporter.js";
 import { initResizeHandle } from "./resizablePanels.js";
+import { showToast, initThemeToggle } from "./ui.js";
 
 // ============================================================
 // Auth & Route Protection (Appwrite)
@@ -36,6 +37,12 @@ const COLLECTION_ID = 'userid'
 let currentUser = null;
 const urlParams = new URLSearchParams(window.location.search);
 const graphId = urlParams.get('graphId');
+// خاصنا واحد المتغير قابل للتحديث (ماشي const بحال graphId) حيت فاش
+// كنولدو مبيان جديد (ماكانش graphId فالـ URL)، أول Sauvegarde تلقائية
+// (juste après stage "extraction") هي لي غادي تعطينا $id ديال الوثيقة —
+// من بعد كل سطوجات التالية (stage "graph"، rename...) خاصهم يحدثو
+// نفس الوثيقة، ماشي يخلقو وحدة جديدة.
+let currentDbId = graphId;
 
 // تأكد واش مكونيكطي واحتفظ باليوزر باش نربطو بيه المبيان
 account.get()
@@ -61,6 +68,19 @@ async function loadGraphFromDB(id) {
 
         const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, id);
 
+        // Ownership check côté client — la vraie protection reste les
+        // permissions Appwrite (collection/document level), mais ce
+        // garde-fou évite qu'un $id deviné/partagé n'affiche un graphe
+        // d'un autre compte dans CETTE session déjà authentifiée.
+        if (doc.userId && doc.userId !== currentUser.$id) {
+          showToast("Ce graphe ne t'appartient pas.", "error");
+          window.location.href = "dashboard.html";
+          return;
+        }
+
+        currentDbId = id;
+        currentSourceCount = doc.sourceCount || 1;
+
         // تحويل النص المخزن إلى JSON Object ديال nodes و edges
         const parsedData = JSON.parse(doc.graphData);
         currentGraphData = parsedData;
@@ -79,11 +99,14 @@ async function loadGraphFromDB(id) {
         emptyState.style.display = "none";
         learningPathBtn.disabled = false;
         exportPdfBtn.disabled = false;
+        exportJsonBtn.disabled = false;
+        statsBtn.disabled = false;
         arrangeGraphBtn.disabled = false;
 
         drawGraph();
     } catch (err) {
         console.error("Erreur chargement graphe:", err);
+        showToast("Impossible de charger ce graphe.", "error");
         emptyState.style.display = "block";
         emptyState.textContent = "Impossible de charger ce graphe.";
     }
@@ -115,7 +138,32 @@ const layoutEl = document.querySelector(".layout");
 
 const learningPathBtn = document.getElementById("learningPathBtn");
 const exportPdfBtn = document.getElementById("exportPdfBtn");
+const exportJsonBtn = document.getElementById("exportJsonBtn");
+const statsBtn = document.getElementById("statsBtn");
 const arrangeGraphBtn = document.getElementById("arrangeGraphBtn");
+
+const confidenceSlider = document.getElementById("confidenceSlider");
+const confidenceValue = document.getElementById("confidenceValue");
+
+const mergeToggleWrap = document.getElementById("mergeToggleWrap");
+const mergeToggleCheckbox = document.getElementById("mergeToggleCheckbox");
+
+const jsonImportInput = document.getElementById("jsonImportInput");
+const importJsonBtn = document.getElementById("importJsonBtn");
+
+const rememberKeyCheckbox = document.getElementById("rememberKeyCheckbox");
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+
+const statsModalBackdrop = document.getElementById("statsModalBackdrop");
+const statsModalBody = document.getElementById("statsModalBody");
+const statsModalClose = document.getElementById("statsModalClose");
+
+const addRelationModalBackdrop = document.getElementById("addRelationModalBackdrop");
+const addRelationModalClose = document.getElementById("addRelationModalClose");
+const addRelationForm = document.getElementById("addRelationForm");
+const relationFromSelect = document.getElementById("relationFromSelect");
+const relationTypeSelect = document.getElementById("relationTypeSelect");
+const relationToSelect = document.getElementById("relationToSelect");
 
 const sourceResult = document.getElementById("sourceResult");
 const sourceResultBlock = document.getElementById("sourceResultBlock");
@@ -141,6 +189,32 @@ let currentGraphData = null;  // {nodes, edges} — stage 2 output, kept for exp
 let currentSections = null;   // stage 1 output — kept for "aller à la source" + chat context
 let currentCy = null;         // live Cytoscape instance — kept for export + programmatic selection
 let activeChatNode = null;    // which node the inline chat is currently about
+let currentConfidenceThreshold = DEFAULT_CONFIDENCE_THRESHOLD; // pilotée par le slider
+let currentSourceCount = 1;   // nombre de sources fusionnées dans ce graphe (mode "ajouter une source")
+
+initThemeToggle(themeToggleBtn);
+
+// ============================================================
+// Clé API Mistral — mémoire par défaut (jamais persistée), avec un
+// opt-in explicite "se souvenir" qui la garde en sessionStorage
+// (effacée à la fermeture de l'onglet, jamais localStorage/disque).
+// ============================================================
+const SESSION_KEY_STORAGE = "constella-mistral-key";
+
+const savedSessionKey = sessionStorage.getItem(SESSION_KEY_STORAGE);
+if (savedSessionKey) {
+  apiKeyInput.value = savedSessionKey;
+  runtimeAuth.apiKey = savedSessionKey;
+  rememberKeyCheckbox.checked = true;
+}
+
+rememberKeyCheckbox.addEventListener("change", () => {
+  if (rememberKeyCheckbox.checked) {
+    sessionStorage.setItem(SESSION_KEY_STORAGE, apiKeyInput.value.trim());
+  } else {
+    sessionStorage.removeItem(SESSION_KEY_STORAGE);
+  }
+});
 
 // ============================================================
 // Titre du graphe — clic pour renommer (contenteditable)
@@ -159,12 +233,13 @@ async function commitGraphTitle() {
   const newTitle = graphTitleEl.textContent.trim() || "Nouveau graphe";
   graphTitleEl.textContent = newTitle;
 
-  // إيلا كان المبيان محفوظ ديجا (عندو graphId فالـ URL)، صيفط التسمية الجديدة لـ Appwrite
-  if (graphId) {
+  // إيلا كان المبيان محفوظ ديجا (عندو ID فالـ DB)، صيفط التسمية الجديدة لـ Appwrite
+  if (currentDbId) {
     try {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, graphId, { title: newTitle });
+      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, currentDbId, { title: newTitle });
     } catch (err) {
       console.error("Erreur renommage:", err);
+      showToast("Impossible d'enregistrer le nouveau titre.", "error");
     }
   }
 }
@@ -193,10 +268,14 @@ arrangeGraphBtn.addEventListener("click", () => {
 });
 
 // ============================================================
-// API key — memory only, never persisted (see README)
+// API key — memory only par défaut, jamais persisté sur disque (voir
+// README) ; sessionStorage seulement si "se souvenir" est coché.
 // ============================================================
 apiKeyInput.addEventListener("input", () => {
   runtimeAuth.apiKey = apiKeyInput.value.trim();
+  if (rememberKeyCheckbox.checked) {
+    sessionStorage.setItem(SESSION_KEY_STORAGE, runtimeAuth.apiKey);
+  }
 });
 
 // ============================================================
@@ -267,6 +346,29 @@ function applyLegendFilter(type) {
 }
 
 // ============================================================
+// Confidence threshold slider — filtre visuel des relations, sans
+// re-générer le graphe ni re-appeler Mistral (juste un re-render
+// Cytoscape avec un seuil différent, cf. graphRenderer.updateThreshold).
+// ============================================================
+confidenceSlider.addEventListener("input", () => {
+  currentConfidenceThreshold = Number(confidenceSlider.value) / 100;
+  confidenceValue.textContent = `${confidenceSlider.value}%`;
+
+  if (!currentGraphData) return;
+
+  const cy = updateThreshold(currentGraphData, currentConfidenceThreshold, graphContainer, {
+    onNodeClick: showNodeDetail,
+    onEdgeClick: showEdgeDetail,
+  });
+  if (cy) {
+    currentCy = cy;
+    currentCy.on("tap", (evt) => {
+      if (evt.target === currentCy) closeNodePopup();
+    });
+  }
+});
+
+// ============================================================
 // Progress feedback — plus de bloc "Pipeline" séparé, on affiche
 // juste les étapes dans emptyState (déjà visible pendant le run).
 // ============================================================
@@ -289,70 +391,188 @@ runBtn.addEventListener("click", async () => {
     return;
   }
 
+  // Mode "ajouter une source" : seulement possible/pertinent s'il y a déjà
+  // un graphe. Capturé AVANT que le pipeline ne commence à écrire dans
+  // currentGraphData/currentSections.
+  const mergeMode = mergeToggleCheckbox.checked && !!currentGraphData?.nodes?.length;
+  const previousSections = currentSections;
+  const previousGraphData = currentGraphData;
+
   runBtn.disabled = true;
   learningPathBtn.disabled = true;
   exportPdfBtn.disabled = true;
+  exportJsonBtn.disabled = true;
+  statsBtn.disabled = true;
   arrangeGraphBtn.disabled = true;
   closeNodePopup();
-  setStage("Extraction en cours...", "active");
+  setStage(mergeMode ? "Extraction de la nouvelle source..." : "Extraction en cours...", "active");
 
   try {
     const pages = selectedFile
       ? await extractPdfPages(selectedFile)
       : wrapPastedText(pasteText.value);
 
+    // Préfixe unique pour cette exécution — sert à éviter toute collision
+    // d'id (sections/nodes/edges) quand on fusionne dans un graphe existant.
+    const runToken = Date.now().toString(36);
+
     const context = {
       apiKey: runtimeAuth.apiKey,
       onProgress: (msg) => setStage(msg, "active"),
+      // كنحفظو تلقائيًا فـ Appwrite بمجرد ماكل مرحلة كتنتج نتيجتها —
+      // ماشي كنتسناو نهاية الـ pipeline كاملة. هكاك، إيلا الموديل نتج
+      // sections (stage "extraction") ومن بعد وقع خطأ فـ stage "graph"،
+      // السورس يبقى محفوظ فالـ DB ومايضيعش.
+      onStageComplete: async (stageName, output) => {
+        if (stageName === "extraction") {
+          if (mergeMode && previousSections) {
+            // نرينوميرو sections الجداد باش مايتقاطعوش مع ids الكاينين
+            // ديجا (s1, s2...) — كنبدلو ids ديال "output" IN PLACE، هكاك
+            // stage "graph" اللي غادي تجي من بعد فـ pipeline.js غادي تشوف
+            // نفس ids الجداد (pipeline.js كيصيفط نفس الـ reference).
+            const baseIndex = previousSections.length;
+            output.forEach((s, i) => { s.id = `${runToken}_s${baseIndex + i + 1}`; });
+            currentSections = [...previousSections, ...output];
+          } else {
+            currentSections = output;
+          }
+        } else if (stageName === "graph") {
+          if (mergeMode && previousGraphData) {
+            currentGraphData = mergeGraphData(previousGraphData, output, runToken);
+          } else {
+            currentGraphData = output;
+          }
+        }
+        try {
+          setStage(
+            stageName === "extraction"
+              ? "Sauvegarde du texte source..."
+              : "Sauvegarde du graphe...",
+            "active"
+          );
+          await persistGraphToDatabase();
+        } catch (saveError) {
+          // خطأ ف Sauvegarde ماخصوش يوقف الـ pipeline (الموديل مزال خدام) —
+          // كنسجلوه فـ console + toast غير مزعج (non-bloquant).
+          console.error(`Erreur de sauvegarde automatique (${stageName}):`, saveError);
+          showToast("Échec de la sauvegarde automatique — le texte/graphe reste affiché, réessaie plus tard.", "error");
+        }
+      },
     };
+
+    if (mergeMode) currentSourceCount += 1;
 
     // pipeline.execute() renvoie la sortie de CHAQUE étape, indexée par
     // nom — on a besoin des sections de l'étape "extraction" plus tard
     // pour "aller à la source" et le chat, en plus du graphe final.
+    // (currentSections / currentGraphData sont déjà à jour ici grâce à
+    // onStageComplete, mais on les réaffecte pour rester explicite — pas
+    // utile en mode merge, où onStageComplete a déjà fait la fusion.)
     const results = await runPipeline(pages, context);
-    currentSections = results.extraction;
-    currentGraphData = results.graph;
-
-    try {
-      setStage("Sauvegarde en cours...", "active");
-
-      const graphTitle = graphTitleEl.textContent.trim() ||
-        (selectedFile ? selectedFile.name.replace(/\.pdf$/i, "") : "Texte collé");
-      graphTitleEl.textContent = graphTitle;
-
-      await databases.createDocument(
-        DATABASE_ID,
-        COLLECTION_ID,
-        ID.unique(),
-        {
-          userId: currentUser.$id,
-          title: graphTitle,
-          icon: '📄',
-          sourceCount: 1,
-          graphData: JSON.stringify(currentGraphData),
-          // كنخزنو نص السورس (sections منظفة من stage 1) باش "aller à la
-          // source" وchat العام يبقاو خدامين حتى منين نرجعو نحلو هاد
-          // المبيان من الداشبورد. ملحوظة: خاص collection ديال Appwrite
-          // يكون فيها attribute "sections" (string, حجم كبير كفاية).
-          sections: JSON.stringify(currentSections)
-        }
-      );
-    } catch (saveError) {
-      console.error("Erreur de sauvegarde:", saveError);
+    if (!mergeMode) {
+      currentSections = results.extraction;
+      currentGraphData = results.graph;
     }
 
     learningPathBtn.disabled = false;
     exportPdfBtn.disabled = false;
+    exportJsonBtn.disabled = false;
+    statsBtn.disabled = false;
     arrangeGraphBtn.disabled = false;
+
+    // نمسحو الفورم باش المستخدم مايعاودش يبعث نفس السورس بالغلط
+    selectedFile = null;
+    pasteText.value = "";
+    dropzone.querySelector("p strong").textContent = "Dépose un PDF";
+    mergeToggleCheckbox.checked = false;
 
     emptyState.style.display = "none";
     drawGraph();
+    showToast(mergeMode ? "Source ajoutée au graphe." : "Graphe généré.", "success");
   } catch (err) {
     setStage(err.message, "error");
+    showToast(err.message, "error");
   } finally {
     runBtn.disabled = false;
   }
 });
+
+/**
+ * Fusionne le graphe fraîchement extrait (`fresh`, sortie de stage "graph"
+ * sur la NOUVELLE source uniquement) dans le graphe existant (`existing`).
+ * Dédoublonne les nœuds par label (insensible à la casse/espaces) — si
+ * "Débit" existe déjà, le nouveau nœud "débit" est fusionné dedans plutôt
+ * que dupliqué, et toute relation qui le référence est remappée vers le
+ * nœud existant. Limite connue : dédoublonnage par égalité de libellé
+ * uniquement (pas de correspondance sémantique/fuzzy).
+ */
+function mergeGraphData(existing, fresh, runToken) {
+  const idMap = new Map(); // id (dans `fresh`) -> id final (existant réutilisé, ou nouveau préfixé)
+  const mergedNodes = [...existing.nodes];
+
+  fresh.nodes.forEach((n) => {
+    const match = existing.nodes.find(
+      (en) => en.label.trim().toLowerCase() === n.label.trim().toLowerCase()
+    );
+    if (match) {
+      idMap.set(n.id, match.id);
+    } else {
+      const newId = `${runToken}_${n.id}`;
+      idMap.set(n.id, newId);
+      mergedNodes.push({ ...n, id: newId });
+    }
+  });
+
+  const mergedEdges = [...existing.edges];
+  const existingEdgeKeys = new Set(existing.edges.map((e) => `${e.source}|${e.target}|${e.type}`));
+
+  fresh.edges.forEach((e) => {
+    const source = idMap.get(e.source) ?? e.source;
+    const target = idMap.get(e.target) ?? e.target;
+    const key = `${source}|${target}|${e.type}`;
+    if (existingEdgeKeys.has(key)) return; // déjà présente (probablement entre 2 nœuds dédupliqués)
+    existingEdgeKeys.add(key);
+    mergedEdges.push({ ...e, id: `${runToken}_${e.id}`, source, target });
+  });
+
+  return { nodes: mergedNodes, edges: mergedEdges };
+}
+
+/**
+ * Crée OU met à jour (selon `currentDbId`) le document Appwrite du
+ * graphe courant, avec ce qu'on a sous la main pour l'instant (sections
+ * et/ou graphData — l'un des deux peut encore être vide juste après
+ * stage "extraction"). Toujours appelée automatiquement, jamais un
+ * bouton "sauvegarder" séparé.
+ */
+async function persistGraphToDatabase() {
+  const graphTitle = graphTitleEl.textContent.trim() ||
+    (selectedFile ? selectedFile.name.replace(/\.pdf$/i, "") : "Texte collé");
+  graphTitleEl.textContent = graphTitle;
+
+  // نصيفطو ديما JSON string صحيحة (ماشي null/undefined) حيت Appwrite
+  // كيتسنى string فهاد attributes — واخا currentGraphData مازال ماوصلش.
+  const payload = {
+    userId: currentUser.$id,
+    title: graphTitle,
+    icon: '📄',
+    sourceCount: currentSourceCount,
+    graphData: JSON.stringify(currentGraphData ?? {}),
+    sections: JSON.stringify(currentSections ?? null),
+  };
+
+  if (!currentDbId) {
+    const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), payload);
+    currentDbId = doc.$id;
+    // نحدثو الـ URL بلا reload، باش أي update لاحقة (rename، stage "graph"،
+    // ريفريش ديال الصفحة...) تلقى نفس الوثيقة بدل ما تخلق وحدة جديدة.
+    const url = new URL(window.location.href);
+    url.searchParams.set('graphId', currentDbId);
+    window.history.replaceState({}, '', url);
+  } else {
+    await databases.updateDocument(DATABASE_ID, COLLECTION_ID, currentDbId, payload);
+  }
+}
 
 // ============================================================
 // Graph rendering
@@ -369,8 +589,12 @@ function drawGraph() {
       : "Clique sur un concept dans le graphe, puis « Demander à l'IA ».";
   }
 
+  // خيار "ajouter une source" ما كيبانش غير إيلا كاين ديجا غراف نقدرو
+  // نزيدو عليه (ماشي أول extraction).
+  mergeToggleWrap.style.display = currentGraphData?.nodes?.length ? "flex" : "none";
+
   currentCy = renderGraph(currentGraphData, graphContainer, {
-    confidenceThreshold: DEFAULT_CONFIDENCE_THRESHOLD,
+    confidenceThreshold: currentConfidenceThreshold,
     onNodeClick: showNodeDetail,
     onEdgeClick: showEdgeDetail,
   });
@@ -397,9 +621,13 @@ function showNodeDetail(node) {
       ${renderRelationsBlock("Ce que ce concept implique / produit", relations.outgoing)}
       ${renderRelationsBlock("Ce qui mène à ce concept", relations.incoming)}
 
+      <div id="nodeEditZone"></div>
+
       <div class="detail-actions">
         <button data-role="ask-ai"><i class="fa-solid fa-robot"></i> Demander à l'IA</button>
         <button data-role="go-to-source"><i class="fa-solid fa-quote-right"></i> Voir dans le texte source</button>
+        <button data-role="edit-node"><i class="fa-solid fa-pen"></i> Modifier</button>
+        <button data-role="add-relation"><i class="fa-solid fa-link"></i> Ajouter une relation</button>
       </div>
     </div>`;
 
@@ -408,6 +636,12 @@ function showNodeDetail(node) {
 
   nodePopupBody.querySelector('[data-role="go-to-source"]')
     ?.addEventListener("click", () => showSourceInLeftPanel({ sectionId: node.sourceSectionId, quote: node.sourceQuote }));
+
+  nodePopupBody.querySelector('[data-role="edit-node"]')
+    ?.addEventListener("click", () => showNodeEditForm(node));
+
+  nodePopupBody.querySelector('[data-role="add-relation"]')
+    ?.addEventListener("click", () => openAddRelationModal(node.id));
 
   nodePopupBody.querySelectorAll(".chip").forEach((chip) => {
     chip.addEventListener("click", () => {
@@ -419,6 +653,52 @@ function showNodeDetail(node) {
   });
 
   openNodePopup();
+}
+
+/**
+ * Formulaire d'édition inline (label + définition) — corrige une erreur
+ * du modèle sans avoir à relancer toute l'extraction. Met à jour
+ * currentGraphData ET l'élément Cytoscape déjà rendu (pas de redraw
+ * complet, donc zoom/position du graphe ne bougent pas), puis sauvegarde.
+ */
+function showNodeEditForm(node) {
+  const zone = nodePopupBody.querySelector("#nodeEditZone");
+  if (!zone) return;
+
+  zone.innerHTML = `
+    <p class="field-label">Modifier le concept</p>
+    <input type="text" class="edit-field" id="editNodeLabel" value="${escapeHtml(node.label)}" />
+    <textarea class="edit-field" id="editNodeDefinition" rows="3">${escapeHtml(node.definition)}</textarea>
+    <div class="edit-actions-row">
+      <button type="button" class="primary" id="saveNodeEditBtn">Enregistrer</button>
+      <button type="button" id="cancelNodeEditBtn">Annuler</button>
+    </div>
+  `;
+
+  zone.querySelector("#cancelNodeEditBtn").addEventListener("click", () => showNodeDetail(node));
+
+  zone.querySelector("#saveNodeEditBtn").addEventListener("click", async () => {
+    const newLabel = zone.querySelector("#editNodeLabel").value.trim();
+    const newDefinition = zone.querySelector("#editNodeDefinition").value.trim();
+    if (!newLabel) return;
+
+    node.label = newLabel;
+    node.definition = newDefinition;
+
+    // Cytoscape : on met juste à jour les data du nœud existant, pas
+    // besoin de tout redessiner (préserve le layout/zoom en cours).
+    currentCy?.$id(node.id).data({ label: newLabel, definition: newDefinition });
+
+    showNodeDetail(node);
+
+    try {
+      await persistGraphToDatabase();
+      showToast("Concept mis à jour.", "success");
+    } catch (err) {
+      console.error("Erreur édition nœud:", err);
+      showToast("Modifié localement, mais la sauvegarde a échoué.", "error");
+    }
+  });
 }
 
 /** Renders one grouped-relations section, or nothing if the node has none in that direction. */
@@ -459,8 +739,17 @@ function showEdgeDetail(edge) {
       <p class="field-label">Source</p>
       <p class="quote">"${escapeHtml(edge.sourceQuote)}"</p>
 
+      <div id="edgeEditZone">
+        <p class="field-label">Modifier le type</p>
+        <select class="edit-field" id="editEdgeType">
+          ${RELATION_TYPES.map((r) => `<option value="${r.key}" ${r.key === edge.type ? "selected" : ""}>${escapeHtml(r.label)}</option>`).join("")}
+        </select>
+      </div>
+
       <div class="detail-actions">
         <button data-role="go-to-source"><i class="fa-solid fa-quote-right"></i> Voir dans le texte source</button>
+        <button data-role="save-edge-type"><i class="fa-solid fa-check"></i> Enregistrer le type</button>
+        <button data-role="delete-edge" class="danger-action"><i class="fa-solid fa-trash"></i> Supprimer la relation</button>
       </div>
     </div>`;
 
@@ -469,6 +758,34 @@ function showEdgeDetail(edge) {
   // les sections par citation quand sectionId est absent.
   nodePopupBody.querySelector('[data-role="go-to-source"]')
     ?.addEventListener("click", () => showSourceInLeftPanel({ quote: edge.sourceQuote }));
+
+  nodePopupBody.querySelector('[data-role="save-edge-type"]')?.addEventListener("click", async () => {
+    const newType = nodePopupBody.querySelector("#editEdgeType").value;
+    if (!RELATION_KEYS.includes(newType) || newType === edge.type) return;
+    edge.type = newType;
+    drawGraph(); // le style (couleur/forme de flèche) dépend du type -> redraw complet nécessaire
+    try {
+      await persistGraphToDatabase();
+      showToast("Type de relation mis à jour.", "success");
+    } catch (err) {
+      console.error("Erreur édition relation:", err);
+      showToast("Modifié localement, mais la sauvegarde a échoué.", "error");
+    }
+  });
+
+  nodePopupBody.querySelector('[data-role="delete-edge"]')?.addEventListener("click", async () => {
+    if (!confirm("Supprimer cette relation ?")) return;
+    currentGraphData.edges = currentGraphData.edges.filter((e) => e.id !== edge.id);
+    closeNodePopup();
+    drawGraph();
+    try {
+      await persistGraphToDatabase();
+      showToast("Relation supprimée.", "success");
+    } catch (err) {
+      console.error("Erreur suppression relation:", err);
+      showToast("Supprimé localement, mais la sauvegarde a échoué.", "error");
+    }
+  });
 
   openNodePopup();
 }
@@ -708,11 +1025,186 @@ exportPdfBtn.addEventListener("click", async () => {
   exportPdfBtn.disabled = true;
   try {
     await exportGraphToPdf(currentCy, currentGraphData, { title: graphTitleEl.textContent.trim() || "Graphe de concepts" });
+    showToast("PDF exporté.", "success");
   } catch (err) {
-    alert(`Échec de l'export PDF : ${err.message}`);
+    showToast(`Échec de l'export PDF : ${err.message}`, "error");
   } finally {
     exportPdfBtn.disabled = false;
   }
+});
+
+// ============================================================
+// Export JSON (données brutes — nodes/edges)
+// ============================================================
+exportJsonBtn.addEventListener("click", () => {
+  if (!currentGraphData) return;
+  try {
+    exportGraphToJson(currentGraphData, { title: graphTitleEl.textContent.trim() || "graphe" });
+  } catch (err) {
+    showToast(`Échec de l'export JSON : ${err.message}`, "error");
+  }
+});
+
+// ============================================================
+// Import JSON — démarre un NOUVEAU graphe à partir d'un export
+// précédent (nodes/edges). Le texte source (sections) n'est pas
+// inclus dans cet export, donc "aller à la source" ne sera pas
+// disponible pour un graphe importé — comportement déjà géré par
+// showSourceInLeftPanel quand currentSections est null.
+// ============================================================
+importJsonBtn.addEventListener("click", () => jsonImportInput.click());
+
+jsonImportInput.addEventListener("change", async () => {
+  const file = jsonImportInput.files[0];
+  jsonImportInput.value = ""; // permet de réimporter le même fichier deux fois de suite
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+
+    if (!Array.isArray(parsed?.nodes) || !Array.isArray(parsed?.edges)) {
+      throw new Error("Le fichier ne contient pas un graphe valide (attendu : { nodes: [...], edges: [...] }).");
+    }
+
+    currentGraphData = { nodes: parsed.nodes, edges: parsed.edges };
+    currentSections = null; // pas de texte source dans un JSON importé
+    currentDbId = null;     // on démarre un NOUVEAU document en base
+    currentSourceCount = 1;
+    activeChatNode = null;
+
+    graphTitleEl.textContent = file.name.replace(/\.json$/i, "") || "Graphe importé";
+
+    learningPathBtn.disabled = false;
+    exportPdfBtn.disabled = false;
+    exportJsonBtn.disabled = false;
+    statsBtn.disabled = false;
+    arrangeGraphBtn.disabled = false;
+
+    emptyState.style.display = "none";
+    drawGraph();
+
+    try {
+      await persistGraphToDatabase();
+    } catch (saveError) {
+      console.error("Erreur sauvegarde import:", saveError);
+      showToast("Graphe importé, mais la sauvegarde a échoué — réessaie de le renommer pour forcer une sauvegarde.", "error");
+    }
+
+    showToast("Graphe importé.", "success");
+  } catch (err) {
+    showToast(`Échec de l'import : ${err.message}`, "error");
+  }
+});
+
+// ============================================================
+// Statistiques du graphe
+// ============================================================
+statsBtn.addEventListener("click", () => {
+  if (!currentGraphData) return;
+
+  const { nodes, edges } = currentGraphData;
+  const avgConfidence = edges.length
+    ? edges.reduce((sum, e) => sum + (e.confidence ?? 0), 0) / edges.length
+    : 0;
+
+  const breakdown = RELATION_TYPES.map((r) => ({
+    ...r,
+    count: edges.filter((e) => e.type === r.key).length,
+  })).filter((r) => r.count > 0);
+
+  statsModalBody.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-value">${nodes.length}</div>
+        <div class="stat-label">Concepts</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${edges.length}</div>
+        <div class="stat-label">Relations</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${Math.round(avgConfidence * 100)}%</div>
+        <div class="stat-label">Confiance moyenne</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value">${currentSourceCount}</div>
+        <div class="stat-label">Source(s)</div>
+      </div>
+    </div>
+    ${breakdown
+      .map(
+        (r) => `
+      <div class="stats-breakdown-row">
+        <span style="color:${r.color}">${escapeHtml(r.label)}</span>
+        <span>${r.count}</span>
+      </div>`
+      )
+      .join("")}
+  `;
+
+  statsModalBackdrop.classList.add("open");
+});
+statsModalClose.addEventListener("click", () => statsModalBackdrop.classList.remove("open"));
+statsModalBackdrop.addEventListener("click", (e) => {
+  if (e.target === statsModalBackdrop) statsModalBackdrop.classList.remove("open");
+});
+
+// ============================================================
+// Ajouter une relation manuelle (corrige un lien manqué par le
+// modèle). Confiance fixée à 1, pas de citation source (ajout humain).
+// ============================================================
+function openAddRelationModal(fromNodeId) {
+  if (!currentGraphData?.nodes?.length) return;
+
+  const optionsHtml = currentGraphData.nodes
+    .map((n) => `<option value="${n.id}">${escapeHtml(n.label)}</option>`)
+    .join("");
+  relationFromSelect.innerHTML = optionsHtml;
+  relationToSelect.innerHTML = optionsHtml;
+  relationTypeSelect.innerHTML = RELATION_TYPES.map((r) => `<option value="${r.key}">${escapeHtml(r.label)}</option>`).join("");
+
+  if (fromNodeId) relationFromSelect.value = fromNodeId;
+
+  closeNodePopup();
+  addRelationModalBackdrop.classList.add("open");
+}
+
+addRelationForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const source = relationFromSelect.value;
+  const target = relationToSelect.value;
+  const type = relationTypeSelect.value;
+
+  if (source === target) {
+    showToast("Choisis deux concepts différents.", "error");
+    return;
+  }
+  if (!RELATION_KEYS.includes(type)) return;
+
+  currentGraphData.edges.push({
+    id: `manual_${Date.now().toString(36)}`,
+    source,
+    target,
+    type,
+    confidence: 1,
+    sourceQuote: "Relation ajoutée manuellement (pas de citation source).",
+  });
+
+  addRelationModalBackdrop.classList.remove("open");
+  drawGraph();
+
+  try {
+    await persistGraphToDatabase();
+    showToast("Relation ajoutée.", "success");
+  } catch (err) {
+    console.error("Erreur ajout relation:", err);
+    showToast("Relation ajoutée localement, mais la sauvegarde a échoué.", "error");
+  }
+});
+addRelationModalClose.addEventListener("click", () => addRelationModalBackdrop.classList.remove("open"));
+addRelationModalBackdrop.addEventListener("click", (e) => {
+  if (e.target === addRelationModalBackdrop) addRelationModalBackdrop.classList.remove("open");
 });
 
 // ============================================================

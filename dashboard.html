@@ -11,8 +11,11 @@
   <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
   
   <!-- كنستعملو نفس الستايل الأصلي باش نحافظو على الألوان -->
-  <link rel="stylesheet" href="../css/style.css" />
-  <link rel="stylesheet" href="../css/dashboard.css" />
+  <!-- ملحوظة: صححنا هنا المسار — dashboard.html كاين فالروت ديال المشروع
+       (حدا index.html)، ماشي وسط مجلد فرعي، فخاص المسار يكون "css/..."
+       ماشي "../css/..." (اللي كان غيدير 404 على الديبلوي). -->
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
 </head>
 <body>
 
@@ -24,13 +27,20 @@
     </div>
     <div class="user-profile">
       <span id="userName">Chargement...</span>
+      <button id="themeToggleBtn" class="icon-btn" title="Changer de thème" aria-label="Changer entre thème sombre et clair">
+        <i class="fa-solid fa-sun"></i>
+      </button>
       <button id="logoutBtn" class="logout-btn">Déconnexion</button>
     </div>
   </header>
 
   <main class="dashboard-main">
     <h2 class="section-title">Recent graphs</h2>
-    
+
+    <div class="dashboard-toolbar">
+      <input type="search" id="searchInput" class="search-input" placeholder="Rechercher un graphe..." aria-label="Rechercher un graphe par titre" />
+    </div>
+
     <div class="graphs-grid" id="graphsGrid">
       
       <!-- الكارد ديال إنشاء مبيان جديد (دائما كاينة) -->
@@ -39,22 +49,15 @@
         <p>Create new graph</p>
       </div>
 
-      <!-- هنا غيتحطو المبيانات القدام بالـ JS -->
-      <!-- مثال كيفاش غيبانو (غيمسحو JS ويعوضهم بالداطا الحقيقية) -->
-      <div class="graph-card" style="display: none;">
-        <div class="card-header">
-          <span class="card-icon">⚔️</span>
-          <button class="card-options">⋮</button>
-        </div>
-        <div class="card-info">
-          <h3>Al-Andalus y la Reconquista: ...</h3>
-          <p>19 Mar 2026 • 1 source</p>
-        </div>
-      </div>
+    </div>
 
+    <div class="load-more-wrap" id="loadMoreWrap" style="display:none">
+      <button id="loadMoreBtn" class="load-more-btn">Charger plus</button>
     </div>
   </main>
 
-  <script type="module" src="../js/dashboard.js"></script>
+  <script type="module" src="js/dashboard.js"></script>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 </body>
 </html>

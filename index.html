@@ -24,7 +24,7 @@
 
 <header class="topbar">
   <div class="topbar-side topbar-left">
-    <a href="dashboard.html" class="icon-btn" id="backToDashboardBtn" title="Retour au tableau de bord">
+    <a href="dashboard.html" class="icon-btn" id="backToDashboardBtn" title="Retour au tableau de bord" aria-label="Retour au tableau de bord">
       <i class="fa-solid fa-arrow-left"></i>
     </a>
     <span class="brand-mark">⌗</span>
@@ -39,13 +39,21 @@
     <div class="key-field">
       <label for="apiKey">Clé API Mistral</label>
       <input id="apiKey" type="password" placeholder="colle ta clé ici" autocomplete="off" />
+      <label class="inline-checkbox">
+        <input type="checkbox" id="rememberKeyCheckbox" />
+        Se souvenir (cet onglet seulement)
+      </label>
     </div>
 
     <div class="user-info">
       <span id="userNameDisplay">Loading...</span>
     </div>
 
-    <button id="logoutBtn" class="icon-btn logout-btn" title="Déconnexion">
+    <button id="themeToggleBtn" class="icon-btn" title="Changer de thème" aria-label="Changer entre thème sombre et clair">
+      <i class="fa-solid fa-sun"></i>
+    </button>
+
+    <button id="logoutBtn" class="icon-btn logout-btn" title="Déconnexion" aria-label="Se déconnecter">
       <i class="fa-solid fa-arrow-right-from-bracket"></i>
     </button>
   </div>
@@ -63,7 +71,17 @@
       </div>
       <p class="or-divider">— ou —</p>
       <textarea id="pasteText" placeholder="colle le texte du cours ici..."></textarea>
+      <p class="or-divider">— ou —</p>
+      <input type="file" id="jsonImportInput" accept="application/json" hidden />
+      <button type="button" id="importJsonBtn" class="secondary-btn" aria-label="Importer un graphe déjà exporté en JSON">
+        <i class="fa-solid fa-file-import"></i> Importer un graphe (.json)
+      </button>
     </section>
+
+    <label class="inline-checkbox" id="mergeToggleWrap" style="display:none">
+      <input type="checkbox" id="mergeToggleCheckbox" />
+      Ajouter cette source au graphe actuel (au lieu de le remplacer)
+    </label>
 
     <button id="runBtn" class="run-btn">Lancer l'extraction</button>
 
@@ -79,12 +97,24 @@
 
   <section class="graph-stage">
     <div class="graph-toolbar">
-      <button id="learningPathBtn" class="icon-btn" title="Parcours conseillé" disabled>
+      <button id="learningPathBtn" class="icon-btn" title="Parcours conseillé" aria-label="Parcours d'apprentissage conseillé" disabled>
         <i class="fa-solid fa-route"></i>
       </button>
-      <button id="exportPdfBtn" class="icon-btn" title="Exporter en PDF" disabled>
+      <button id="statsBtn" class="icon-btn" title="Statistiques du graphe" aria-label="Voir les statistiques du graphe" disabled>
+        <i class="fa-solid fa-chart-simple"></i>
+      </button>
+      <button id="exportJsonBtn" class="icon-btn" title="Exporter en JSON (données brutes)" aria-label="Exporter le graphe en JSON" disabled>
+        <i class="fa-solid fa-code"></i>
+      </button>
+      <button id="exportPdfBtn" class="icon-btn" title="Exporter en PDF" aria-label="Exporter le graphe en PDF" disabled>
         <i class="fa-solid fa-file-arrow-down"></i>
       </button>
+    </div>
+
+    <div class="confidence-control">
+      <label for="confidenceSlider">Confiance min.</label>
+      <input type="range" id="confidenceSlider" min="0" max="100" value="60" />
+      <span class="confidence-value" id="confidenceValue">60%</span>
     </div>
 
     <ul id="legend" class="legend legend-overlay"></ul>
@@ -97,7 +127,7 @@
     <!-- ---------- Node / edge detail popup (au-dessus du graphe) ---------- -->
     <div class="node-popup-backdrop" id="nodePopupBackdrop">
       <div class="node-popup" id="nodePopup">
-        <button class="modal-close" id="nodePopupClose">✕</button>
+        <button class="modal-close" id="nodePopupClose" aria-label="Fermer">✕</button>
         <div id="nodePopupBody"></div>
       </div>
     </div>
@@ -112,7 +142,7 @@
       <div class="chat-messages-inline" id="chatMessages"></div>
       <div class="chat-input-row">
         <input id="chatInput" type="text" placeholder="Poser une question à l'IA..." />
-        <button id="chatSendBtn" title="Envoyer"><i class="fa-solid fa-arrow-up"></i></button>
+        <button id="chatSendBtn" title="Envoyer" aria-label="Envoyer la question"><i class="fa-solid fa-arrow-up"></i></button>
       </div>
     </div>
   </aside>
@@ -125,10 +155,10 @@
     <div class="modal-header">
       <h2>Parcours d'apprentissage conseillé</h2>
       <div class="modal-header-actions">
-        <button id="arrangeGraphBtn" class="icon-btn" title="Organiser le graphe (vue parcours)" disabled>
+        <button id="arrangeGraphBtn" class="icon-btn" title="Organiser le graphe (vue parcours)" aria-label="Organiser le graphe en vue parcours" disabled>
           <i class="fa-solid fa-diagram-project"></i>
         </button>
-        <button class="modal-close" id="pathModalClose">✕</button>
+        <button class="modal-close" id="pathModalClose" aria-label="Fermer">✕</button>
       </div>
     </div>
     <div class="modal-body">
@@ -138,6 +168,53 @@
     </div>
   </div>
 </div>
+
+<!-- ---------- Stats modal ---------- -->
+<div class="modal-backdrop" id="statsModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Statistiques du graphe</h2>
+      <button class="modal-close" id="statsModalClose" aria-label="Fermer">✕</button>
+    </div>
+    <div class="modal-body" id="statsModalBody"></div>
+  </div>
+</div>
+
+<!-- ---------- Add relation modal ---------- -->
+<div class="modal-backdrop" id="addRelationModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Ajouter une relation manuelle</h2>
+      <button class="modal-close" id="addRelationModalClose" aria-label="Fermer">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="empty-hint" style="margin-top:0">
+        Relation ajoutée manuellement (confiance = 1, pas de citation source) — utile pour
+        corriger un lien que le modèle a manqué.
+      </p>
+      <form class="add-relation-form" id="addRelationForm">
+        <div>
+          <label>Depuis</label>
+          <select id="relationFromSelect" required></select>
+        </div>
+        <div>
+          <label>Type de relation</label>
+          <select id="relationTypeSelect" required></select>
+        </div>
+        <div>
+          <label>Vers</label>
+          <select id="relationToSelect" required></select>
+        </div>
+        <div class="edit-actions-row">
+          <button type="submit" class="primary">Ajouter la relation</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Toasts (feedback visible pour les sauvegardes/actions) ---------- -->
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
 <script type="module" src="js/app.js"></script>
 </body>

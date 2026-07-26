@@ -55,19 +55,42 @@ function validateSections(raw) {
   );
 }
 
-/**
- * @param {{pageNumber:number, text:string}[]} pages  — output of pdfReader
- * @param {{apiKey:string, onProgress?:Function}} context
- * @returns {Promise<{id:string, heading:string, text:string}[]>}
- */
-export async function run(pages, context) {
+// Heuristique conservative : un document "normal" (quelques pages de
+// cours) tient largement dans une seule requête. Au-delà, on risque de
+// dépasser le budget de contexte utile de Mistral Large une fois le
+// system prompt + schema example ajoutés — mieux vaut découper que
+// risquer une réponse tronquée ou un déni silencieux de qualité.
+const CHUNK_CHAR_LIMIT = 12000;
+
+/** Regroupe les pages en chunks dont le texte cumulé reste sous CHUNK_CHAR_LIMIT.
+ *  Ne découpe jamais une page en deux — si une page seule dépasse déjà la
+ *  limite, elle part seule dans son propre chunk (cas limite accepté). */
+function chunkPages(pages) {
+  const chunks = [];
+  let current = [];
+  let currentLen = 0;
+
+  for (const page of pages) {
+    if (current.length && currentLen + page.text.length > CHUNK_CHAR_LIMIT) {
+      chunks.push(current);
+      current = [];
+      currentLen = 0;
+    }
+    current.push(page);
+    currentLen += page.text.length;
+  }
+  if (current.length) chunks.push(current);
+  return chunks;
+}
+
+/** Un seul appel Mistral sur un chunk de pages ; renumérote les ids de
+ *  sections avec `idOffset` pour rester uniques sur l'ensemble du document. */
+async function runChunk(pages, context, idOffset) {
   const rawText = pages.map((p) => `[page ${p.pageNumber}]\n${p.text}`).join("\n\n");
 
   if (rawText.trim().length < 20) {
     throw new Error("Le texte source est vide ou trop court pour être traité.");
   }
-
-  context.onProgress?.("Lecture et structuration du texte source...");
 
   const result = await callMistral({
     apiKey: context.apiKey,
@@ -83,5 +106,34 @@ export async function run(pages, context) {
     throw new Error("Aucune section valide n'a pu être extraite du document.");
   }
 
-  return sections;
+  return sections.map((s, i) => ({ ...s, id: `s${idOffset + i + 1}` }));
+}
+
+/**
+ * @param {{pageNumber:number, text:string}[]} pages  — output of pdfReader
+ * @param {{apiKey:string, onProgress?:Function}} context
+ * @returns {Promise<{id:string, heading:string, text:string}[]>}
+ */
+export async function run(pages, context) {
+  const totalLength = pages.reduce((sum, p) => sum + p.text.length, 0);
+
+  if (totalLength <= CHUNK_CHAR_LIMIT) {
+    context.onProgress?.("Lecture et structuration du texte source...");
+    return runChunk(pages, context, 0);
+  }
+
+  // Document long : découpage en plusieurs appels séquentiels. Le pacing
+  // (31s entre requêtes Mistral) est déjà géré globalement par
+  // mistralClient.js, donc ces appels successifs restent conformes au
+  // rate limit du free tier automatiquement, sans rien coder ici.
+  const chunks = chunkPages(pages);
+  const allSections = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    context.onProgress?.(`Lecture et structuration du texte source (partie ${i + 1}/${chunks.length})...`);
+    const sections = await runChunk(chunks[i], context, allSections.length);
+    allSections.push(...sections);
+  }
+
+  return allSections;
 }

@@ -16,7 +16,12 @@ const STAGES = [
 
 /**
  * @param {{pageNumber:number, text:string}[]} pages — first input, from pdfReader
- * @param {{apiKey:string, onProgress?:Function}} context
+ * @param {{apiKey:string, onProgress?:Function, onStageComplete?:Function}} context
+ *   onStageComplete(stageName, output) — appelé juste après CHAQUE étape, avec
+ *   sa sortie brute. Ça permet à l'appelant (app.js) de sauvegarder en base de
+ *   données au fur et à mesure (ex: dès que "extraction" produit les sections,
+ *   avant même que "graph" ne tourne), sans que ce fichier ait besoin de savoir
+ *   QUOI faire de cette sortie — il notifie, c'est tout.
  * @returns {Promise<Object>} every stage's output, keyed by stage name —
  *   currently `{ extraction: {id,heading,text}[], graph: {nodes,edges} }`.
  *   Each stage still only ever sees the PREVIOUS stage's output as its
@@ -36,6 +41,7 @@ export async function execute(pages, context) {
       throw new Error(`[étape "${stage.name}"] ${err.message}`);
     }
     results[stage.name] = data;
+    await context.onStageComplete?.(stage.name, data);
   }
 
   // If you append a stage after "graph" in STAGES, its output simply

@@ -58,3 +58,28 @@ function loadImage(src) {
     img.src = src;
   });
 }
+
+/**
+ * Exporte les données brutes ({nodes, edges}) en fichier .json téléchargeable.
+ * Contrairement au PDF (image), ce format peut être réimporté plus tard
+ * (voir app.js: jsonImportInput) ou exploité par un autre outil.
+ * Aucun réseau, aucune clé API — pur export client-side.
+ *
+ * @param {{nodes:Object[], edges:Object[]}} graphData
+ * @param {{title?:string}} [meta]
+ */
+export function exportGraphToJson(graphData, meta = {}) {
+  if (!graphData) throw new Error("Aucun graphe à exporter — lance d'abord une extraction.");
+
+  const title = meta.title || "graphe";
+  const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.replace(/\s+/g, "_")}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
