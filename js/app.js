@@ -23,13 +23,13 @@ import { showToast, initThemeToggle } from "./ui.js";
 // Auth & Route Protection (Appwrite)
 // ============================================================
 // حيت حنا فـ module، Appwrite كنجبدوها من window
-const { Client, Account, Databases, ID } = window.Appwrite;
-const client = new Client()
+const { Client, Account, Databases, Teams, Permission, Role, ID } = window.Appwrite;const client = new Client()
     .setEndpoint('https://fra.cloud.appwrite.io/v1')
     .setProject('6a667fe600130a273954');
 
 const account = new Account(client);
 const databases = new Databases(client);
+const teams = new Teams(client);
 
 const DATABASE_ID = '6a6682d6000846a6685e';
 const COLLECTION_ID = 'kg-app'
@@ -43,6 +43,46 @@ const graphId = urlParams.get('graphId');
 // من بعد كل سطوجات التالية (stage "graph"، rename...) خاصهم يحدثو
 // نفس الوثيقة، ماشي يخلقو وحدة جديدة.
 let currentDbId = graphId;
+// ... الكود اللي الفوق
+const urlParams = new URLSearchParams(window.location.search);
+const graphId = urlParams.get('graphId');
+
+// هادو كيجيو من الإيميل ديال Appwrite
+const teamIdParam = urlParams.get('teamId');
+const membershipIdParam = urlParams.get('membershipId');
+const userIdParam = urlParams.get('userId');
+const secretParam = urlParams.get('secret');
+
+account.get()
+    .then(async (response) => {
+        currentUser = response;
+        document.body.style.display = 'block'; 
+        document.getElementById('userNameDisplay').textContent = response.name || response.email || 'Utilisateur';
+
+        // -------- كود قبول الدعوة --------
+        if (teamIdParam && membershipIdParam && userIdParam && secretParam) {
+            try {
+                // قبول الدعوة 
+                await teams.updateMembershipStatus(teamIdParam, membershipIdParam, userIdParam, secretParam);
+                alert("Vous avez rejoint l'équipe de ce graphe avec succès !");
+                
+                // مسح ديك الروينة من الرابط باش يبقى نقي
+                window.history.replaceState({}, document.title, window.location.pathname + "?graphId=" + graphId);
+            } catch (err) {
+                console.error("Erreur d'acceptation de l'invitation:", err);
+                alert("L'invitation a expiré ou est invalide.");
+            }
+        }
+        // ---------------------------------
+
+        if (graphId) {
+            await loadGraphFromDB(graphId);
+        }
+    })
+    .catch((error) => {
+        // إيلا كليكا على الرابط وهو مامكونيكطيش، نديوه لصفحة الدخول
+        window.location.href = 'auth/login.html';
+    });
 
 // تأكد واش مكونيكطي واحتفظ باليوزر باش نربطو بيه المبيان
 account.get()
@@ -1247,4 +1287,82 @@ function closeShareModal() {
 shareModalClose.addEventListener("click", closeShareModal);
 shareModalBackdrop.addEventListener("click", (e) => {
     if (e.target === shareModalBackdrop) closeShareModal();
+});
+
+// ============================================================
+// Logique de Partage (Appwrite Teams & Permissions)
+// ============================================================
+const confirmShareBtn = document.getElementById("confirmShareBtn");
+const shareStatusMsg = document.getElementById("shareStatusMsg");
+
+confirmShareBtn.addEventListener("click", async () => {
+    const email = document.getElementById("shareEmail").value.trim();
+    const role = document.getElementById("shareRole").value; // 'viewer' أو 'editor'
+    
+    // خاص نكونو عارفين الـ ID ديال المبيان الحالي
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentGraphId = urlParams.get('graphId');
+
+    if (!email || !currentGraphId) {
+        alert("Erreur: Adresse email ou ID du graphe manquant.");
+        return;
+    }
+
+    // تبديل حالة الزر باش نعلمو اليوزر أنه خدام
+    shareStatusMsg.style.display = "block";
+    shareStatusMsg.style.color = "var(--text-primary)";
+    shareStatusMsg.textContent = "Création des accès et envoi de l'email...";
+    confirmShareBtn.disabled = true;
+
+    try {
+        // 1. نكرييو فريق خاص بهاد المبيان (الآيدي ديالو غيكون: team_graphId)
+        const teamId = "team_" + currentGraphId;
+        try {
+            await teams.get(teamId); // كنشوفو واش ديجا كاين
+        } catch (e) {
+            // إيلا ماكانش، كنكرييوه
+            await teams.create(teamId, "Équipe du graphe: " + currentGraphId);
+        }
+
+        // 2. نعدلو صلاحيات المبيان باش الفريق يقدر يشوف أو يعدل
+        await databases.updateDocument(
+            DATABASE_ID, 
+            COLLECTION_ID, 
+            currentGraphId, 
+            undefined, // مادام ماغنبدلوش الداتا، كنخليوها undefined
+            [
+                Permission.read(Role.user(currentUser.$id)),   // مول الشي يقرا
+                Permission.update(Role.user(currentUser.$id)), // مول الشي يعدل
+                Permission.delete(Role.user(currentUser.$id)), // مول الشي يمسح
+                Permission.read(Role.team(teamId, 'viewer')),  // الـ Viewers يقراو
+                Permission.read(Role.team(teamId, 'editor')),  // الـ Editors يقراو
+                Permission.update(Role.team(teamId, 'editor')) // الـ Editors يقدرو يعدلو
+            ]
+        );
+
+        // 3. نصيفطو الدعوة للإيميل
+        // هادا هو الرابط اللي غيكليكي عليه الشخص فـ الإيميل ديالو
+        const redirectUrl = window.location.origin + '/index.html?graphId=' + currentGraphId;
+
+        await teams.createMembership(
+            teamId,
+            [role], // ['viewer'] أو ['editor']
+            email,
+            undefined, // التليفون (مامحتاجينوش)
+            redirectUrl,
+            "" // السمية (مامحتاجينهاش)
+        );
+
+        // ميساج النجاح
+        shareStatusMsg.style.color = "#8fbf7f"; 
+        shareStatusMsg.textContent = `Invitation envoyée avec succès à ${email} en tant que ${role} !`;
+        document.getElementById("shareEmail").value = "";
+
+    } catch (err) {
+        console.error("Erreur de partage:", err);
+        shareStatusMsg.style.color = "#e06b6b"; 
+        shareStatusMsg.textContent = "Erreur: " + err.message;
+    } finally {
+        confirmShareBtn.disabled = false;
+    }
 });
