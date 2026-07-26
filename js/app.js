@@ -26,13 +26,13 @@ import { showToast, initThemeToggle } from "./ui.js";
 const { Client, Account, Databases, ID } = window.Appwrite;
 const client = new Client()
     .setEndpoint('https://fra.cloud.appwrite.io/v1')
-    .setProject('6a6406f5003a13231358');
+    .setProject('6a667fe600130a273954');
 
 const account = new Account(client);
 const databases = new Databases(client);
 
-const DATABASE_ID = '6a64b2d8001b82e7f4dd';
-const COLLECTION_ID = 'userid'
+const DATABASE_ID = '6a6682d6000846a6685e';
+const COLLECTION_ID = 'kg-app'
 
 let currentUser = null;
 const urlParams = new URLSearchParams(window.location.search);
