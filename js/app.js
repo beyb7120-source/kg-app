@@ -1289,7 +1289,7 @@ shareModalBackdrop.addEventListener("click", (e) => {
 });
 
 // ============================================================
-// Logique de Partage (Appwrite Teams & Permissions)
+// Logique de Partage (Appwrite Teams & Permissions) - VERSION CORRIGÉE
 // ============================================================
 const confirmShareBtn = document.getElementById("confirmShareBtn");
 const shareStatusMsg = document.getElementById("shareStatusMsg");
@@ -1298,7 +1298,6 @@ confirmShareBtn.addEventListener("click", async () => {
     const email = document.getElementById("shareEmail").value.trim();
     const role = document.getElementById("shareRole").value; // 'viewer' أو 'editor'
     
-    // خاص نكونو عارفين الـ ID ديال المبيان الحالي
     const urlParams = new URLSearchParams(window.location.search);
     const currentGraphId = urlParams.get('graphId');
 
@@ -1307,49 +1306,57 @@ confirmShareBtn.addEventListener("click", async () => {
         return;
     }
 
-    // تبديل حالة الزر باش نعلمو اليوزر أنه خدام
     shareStatusMsg.style.display = "block";
     shareStatusMsg.style.color = "var(--text-primary)";
     shareStatusMsg.textContent = "Création des accès et envoi de l'email...";
     confirmShareBtn.disabled = true;
 
     try {
-        // 1. نكرييو فريق خاص بهاد المبيان (الآيدي ديالو غيكون: team_graphId)
-        const teamId = "team_" + currentGraphId;
-        try {
-            await teams.get(teamId); // كنشوفو واش ديجا كاين
-        } catch (e) {
-            // إيلا ماكانش، كنكرييوه
-            await teams.create(teamId, "Équipe du graphe: " + currentGraphId);
+        // 1. غنصاوبو جوج فراقي باش نتفاداو مشكل الصلاحيات ديال Appwrite
+        const viewerTeamId = "v_" + currentGraphId;
+        const editorTeamId = "e_" + currentGraphId;
+
+        // نأكدو بلي فريق المشاهدة كاين (ولا نكرييوه)
+        try { 
+            await teams.get(viewerTeamId); 
+        } catch (e) { 
+            await teams.create(viewerTeamId, "Viewers - Graphe: " + currentGraphId); 
         }
 
-        // 2. نعدلو صلاحيات المبيان باش الفريق يقدر يشوف أو يعدل
+        // نأكدو بلي فريق التعديل كاين (ولا نكرييوه)
+        try { 
+            await teams.get(editorTeamId); 
+        } catch (e) { 
+            await teams.create(editorTeamId, "Editors - Graphe: " + currentGraphId); 
+        }
+
+        // 2. نعدلو صلاحيات المبيان باش يقبل هاد الجوج فراقي
         await databases.updateDocument(
             DATABASE_ID, 
             COLLECTION_ID, 
             currentGraphId, 
-            undefined, // مادام ماغنبدلوش الداتا، كنخليوها undefined
+            undefined, // ماغنبدلوش الداتا، غنبدلو غير الصلاحيات
             [
-                Permission.read(Role.user(currentUser.$id)),   // مول الشي يقرا
-                Permission.update(Role.user(currentUser.$id)), // مول الشي يعدل
-                Permission.delete(Role.user(currentUser.$id)), // مول الشي يمسح
-                Permission.read(Role.team(teamId, 'viewer')),  // الـ Viewers يقراو
-                Permission.read(Role.team(teamId, 'editor')),  // الـ Editors يقراو
-                Permission.update(Role.team(teamId, 'editor')) // الـ Editors يقدرو يعدلو
+                Permission.read(Role.user(currentUser.$id)),
+                Permission.update(Role.user(currentUser.$id)),
+                Permission.delete(Role.user(currentUser.$id)),
+                Permission.read(Role.team(viewerTeamId)),  // فريق Viewers يقرا فقط
+                Permission.read(Role.team(editorTeamId)),  // فريق Editors يقرا
+                Permission.update(Role.team(editorTeamId)) // فريق Editors يعدل
             ]
         );
 
-        // 3. نصيفطو الدعوة للإيميل
-        // هادا هو الرابط اللي غيكليكي عليه الشخص فـ الإيميل ديالو
+        // 3. نصيفطو الدعوة للإيميل على حساب الفريق اللي ختار اليوزر
         const redirectUrl = window.location.origin + '/index.html?graphId=' + currentGraphId;
+        const targetTeamId = role === 'viewer' ? viewerTeamId : editorTeamId;
 
         await teams.createMembership(
-            teamId,
-            [role], // ['viewer'] أو ['editor']
+            targetTeamId,
+            [], // خليناها خاوية حيت عزلنا الأدوار ففراقي مستقلة
             email,
-            undefined, // التليفون (مامحتاجينوش)
+            undefined,
             redirectUrl,
-            "" // السمية (مامحتاجينهاش)
+            ""
         );
 
         // ميساج النجاح
