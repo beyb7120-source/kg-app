@@ -44,8 +44,7 @@ const graphId = urlParams.get('graphId');
 // نفس الوثيقة، ماشي يخلقو وحدة جديدة.
 let currentDbId = graphId;
 // ... الكود اللي الفوق
-const urlParams = new URLSearchParams(window.location.search);
-const graphId = urlParams.get('graphId');
+
 
 // هادو كيجيو من الإيميل ديال Appwrite
 const teamIdParam = urlParams.get('teamId');
