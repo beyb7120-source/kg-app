@@ -50,9 +50,24 @@
     </div>
 
     <!-- زر المشاركة غنزيدوه حدا معلومات المستخدم -->
-<button id="openShareModalBtn" class="secondary-btn" style="width: auto; padding: 6px 16px; margin-right: 15px; border-radius: 24px;">
+<!-- <button id="openShareModalBtn" class="secondary-btn" style="width: auto; padding: 6px 16px; margin-right: 15px; border-radius: 24px;">
     <i class="fa-solid fa-share-nodes"></i> Partager
-</button>
+</button> -->
+
+<!-- أزرار المشاركة والإدارة (غيبانو ويتخباو بالـ JS على حساب واش نتا Owner أو Viewer) -->
+<div id="graphActions" style="display: flex; align-items: center; margin-right: 15px;">
+    <!-- أزرار صاحب المبيان -->
+    <button id="openManageModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; margin-right: 10px; border-radius: 24px; background: var(--bg-panel);">
+        <i class="fa-solid fa-users"></i> Accès
+    </button>
+    <button id="openShareModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px;">
+        <i class="fa-solid fa-share-nodes"></i> Partager
+    </button>
+    <!-- زر المدعو (المشاهد أو المحرر) -->
+    <button id="leaveGraphBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px; color: #e06b6b; border-color: #e06b6b;">
+        <i class="fa-solid fa-right-from-bracket"></i> Quitter
+    </button>
+</div>
 
     <button id="themeToggleBtn" class="icon-btn" title="Changer de thème" aria-label="Changer entre thème sombre et clair">
       <i class="fa-solid fa-sun"></i>
@@ -243,6 +258,22 @@
       
       <button id="confirmShareBtn" class="run-btn" style="margin-bottom: 0; border-radius: 24px;">Envoyer l'invitation</button>
       <p id="shareStatusMsg" style="font-size: 12px; margin-top: 12px; text-align: center; display: none; font-family: var(--font-mono);"></p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ---------- Manage Access Modal ---------- -->
+<div class="modal-backdrop" id="manageModalBackdrop">
+  <div class="modal" style="width: min(500px, 90vw);">
+    <div class="modal-header">
+      <h2>Gérer les accès</h2>
+      <button class="modal-close" id="manageModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="membersList" style="max-height: 350px; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+         <p style="text-align: center; color: var(--text-muted); font-size: 14px;">Chargement des collaborateurs...</p>
+      </div>
     </div>
   </div>
 </div>

@@ -121,6 +121,12 @@ async function loadGraphFromDB(id) {
         statsBtn.disabled = false;
         arrangeGraphBtn.disabled = false;
 
+        // إظهار وإخفاء الأزرار على حسب شكون اللي فاتح المبيان
+        const isOwner = doc.userId === currentUser.$id;
+        document.getElementById('openShareModalBtn').style.display = isOwner ? 'block' : 'none';
+        document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
+        document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
+        
         drawGraph();
     } catch (err) {
         console.error("Erreur chargement graphe:", err);
@@ -1342,3 +1348,147 @@ confirmShareBtn.addEventListener("click", async () => {
         confirmShareBtn.disabled = false;
     }
 });
+
+
+// ============================================================
+// Gestion des Accès (Owner) & Quitter le Graphe (Guest)
+// ============================================================
+
+const manageModalBackdrop = document.getElementById("manageModalBackdrop");
+const openManageModalBtn = document.getElementById("openManageModalBtn");
+const manageModalClose = document.getElementById("manageModalClose");
+const membersList = document.getElementById("membersList");
+
+openManageModalBtn.addEventListener("click", async () => {
+    manageModalBackdrop.classList.add("open");
+    await loadCollaborators();
+});
+
+manageModalClose.addEventListener("click", () => manageModalBackdrop.classList.remove("open"));
+manageModalBackdrop.addEventListener("click", (e) => {
+    if (e.target === manageModalBackdrop) manageModalBackdrop.classList.remove("open");
+});
+
+// دالة لجلب وعرض الأعضاء
+async function loadCollaborators() {
+    membersList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement...</p>';
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentGraphId = urlParams.get('graphId');
+    
+    try {
+        // كنجبدو الأعضاء من الفريقين بجوج
+        const vTeam = await teams.listMemberships("v_" + currentGraphId).catch(() => ({ memberships: [] }));
+        const eTeam = await teams.listMemberships("e_" + currentGraphId).catch(() => ({ memberships: [] }));
+        
+        let html = '';
+        const allMembers = [
+            ...vTeam.memberships.map(m => ({ ...m, role: 'viewer', teamId: "v_" + currentGraphId })),
+            ...eTeam.memberships.map(m => ({ ...m, role: 'editor', teamId: "e_" + currentGraphId }))
+        ];
+
+        if (allMembers.length === 0) {
+            html = '<p style="text-align:center; color:var(--text-muted);">Aucun collaborateur pour le moment.</p>';
+        } else {
+            allMembers.forEach(member => {
+                const status = member.confirm ? '<span style="color:#8fbf7f; font-size:11px;">Actif</span>' : '<span style="color:#e06b6b; font-size:11px;">En attente</span>';
+                html += `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
+                    <div>
+                        <div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${member.userEmail}</div>
+                        <div>${status} • Rôle actuel: <strong style="text-transform:capitalize;">${member.role}</strong></div>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="changeRole('${member.$id}', '${member.userEmail}', '${member.role}', '${currentGraphId}')" class="secondary-btn" style="padding:6px 12px; font-size:12px;" title="Changer le rôle">
+                            <i class="fa-solid fa-right-left"></i> Inverser
+                        </button>
+                        <button onclick="revokeAccess('${member.teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none;" title="Supprimer l'accès">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </div>`;
+            });
+        }
+        membersList.innerHTML = html;
+    } catch (err) {
+        console.error("Erreur chargement membres:", err);
+        membersList.innerHTML = '<p style="text-align:center; color:#e06b6b;">Erreur de chargement.</p>';
+    }
+}
+
+// دالة لحذف الصلاحية (الطرد)
+window.revokeAccess = async function(teamId, membershipId) {
+    if(!confirm("Voulez-vous vraiment retirer l'accès à cet utilisateur ?")) return;
+    try {
+        await teams.deleteMembership(teamId, membershipId);
+        showToast("Accès révoqué avec succès.", "success");
+        await loadCollaborators(); // تحديث القائمة
+    } catch (err) {
+        alert("Erreur: " + err.message);
+    }
+};
+
+// دالة لتغيير الدور (من Viewer لـ Editor والعكس)
+window.changeRole = async function(oldMembershipId, email, currentRole, graphId) {
+    if(!confirm(`Voulez-vous changer le rôle de ${email} ? (Un nouvel email lui sera envoyé)`)) return;
+    
+    const oldTeamId = currentRole === 'viewer' ? "v_" + graphId : "e_" + graphId;
+    const newTeamId = currentRole === 'viewer' ? "e_" + graphId : "v_" + graphId;
+    const redirectUrl = window.location.origin + '/index.html?graphId=' + graphId;
+
+    try {
+        // 1. مسح من الفريق القديم
+        await teams.deleteMembership(oldTeamId, oldMembershipId);
+        // 2. إضافة للفريق الجديد
+        await teams.createMembership(newTeamId, [], email, undefined, undefined, redirectUrl, undefined);
+        
+        showToast("Rôle mis à jour, invitation envoyée.", "success");
+        await loadCollaborators();
+    } catch (err) {
+        alert("Erreur lors du changement de rôle: " + err.message);
+    }
+};
+
+// ============================================================
+// Logique pour le bouton "Quitter le graphe" (Guests)
+// ============================================================
+const leaveGraphBtn = document.getElementById("leaveGraphBtn");
+if (leaveGraphBtn) {
+    leaveGraphBtn.addEventListener("click", async () => {
+        if(!confirm("Voulez-vous vraiment quitter ce graphe et perdre votre accès ?")) return;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentGraphId = urlParams.get('graphId');
+        
+        try {
+            // كضيف كنشوفو واش حنا ف v ولا e باش نلقاو membershipId ديالنا
+            let userTeamId = null;
+            let userMembershipId = null;
+
+            try {
+                const vMembers = await teams.listMemberships('v_' + currentGraphId);
+                const mem = vMembers.memberships.find(m => m.userId === currentUser.$id);
+                if(mem) { userTeamId = 'v_' + currentGraphId; userMembershipId = mem.$id; }
+            } catch(e) {}
+
+            if(!userMembershipId) {
+                try {
+                    const eMembers = await teams.listMemberships('e_' + currentGraphId);
+                    const mem = eMembers.memberships.find(m => m.userId === currentUser.$id);
+                    if(mem) { userTeamId = 'e_' + currentGraphId; userMembershipId = mem.$id; }
+                } catch(e) {}
+            }
+
+            if(userMembershipId) {
+                // نحدفو راسنا من الفريق
+                await teams.deleteMembership(userTeamId, userMembershipId);
+                alert("Vous avez quitté le graphe.");
+                window.location.href = "dashboard.html";
+            } else {
+                showToast("Erreur: Impossible de trouver votre accès.", "error");
+            }
+        } catch(err) {
+            console.error("Erreur Quitter:", err);
+            showToast("Erreur lors de la sortie.", "error");
+        }
+    });
+}

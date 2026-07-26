@@ -68,7 +68,7 @@ async function loadUserGraphs({ reset = false } = {}) {
             DATABASE_ID,
             COLLECTION_ID,
             [
-                Query.equal('userId', currentUser.$id),
+                /* Query.equal('userId', currentUser.$id), */
                 Query.orderDesc('$createdAt'),
                 Query.limit(PAGE_SIZE),
                 Query.offset(reset ? 0 : allGraphs.length),
@@ -130,6 +130,9 @@ function renderGraphs(graphs) {
             day: 'numeric', month: 'short', year: 'numeric'
         });
 
+        const isOwner = graph.userId === currentUser.$id;
+        const sharedBadge = !isOwner ? '<span style="background:var(--accent); color:#fff; font-size:10px; padding:2px 8px; border-radius:12px; margin-left:8px; vertical-align:middle;">Partagé avec moi</span>' : '';
+
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-icon-wrap" style="position:relative">
@@ -157,7 +160,8 @@ function renderGraphs(graphs) {
                 </div>
             </div>
             <div class="card-info">
-                <h3>${escapeHtml(graph.title)}</h3>
+            <h3>${escapeHtml(graph.title)}</h3>  
+                
                 <p>${date} • ${graph.sourceCount || 0} source(s)</p>
             </div>
         `;
