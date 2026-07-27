@@ -1411,7 +1411,11 @@ async function ensureShareTeam(graphId) {
             Permission.update(Role.user(currentUser.$id)),
             Permission.delete(Role.user(currentUser.$id)),
             Permission.read(Role.team(teamId)),
-            Permission.update(Role.team(teamId, ["editor"])),
+            // ماشي Role.team(teamId, ['editor']) — Appwrite كيرفض permission
+            // بـ role مازال ماتعطاتش لحتى membership فهاد الفريق (chicken-and-egg
+            // مع فريق جديد). كنعطيو update للفريق كامل، والتقييد الحقيقي
+            // ديال viewer (read-only) كيبقى فـ UI عبر applyOwnRole().
+            Permission.update(Role.team(teamId)),
         ]
     );
     return teamId;
