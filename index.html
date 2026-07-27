@@ -55,10 +55,15 @@
 </button> -->
 
 <!-- أزرار المشاركة والإدارة (غيبانو ويتخباو بالـ JS على حساب واش نتا Owner أو Viewer) -->
-<div id="graphActions" style="display: flex; align-items: center; margin-right: 15px;">
+<div id="graphActions" style="display: flex; align-items: center; margin-right: 15px; gap: 10px;">
+    <!-- زر عمومي: كلشي (Owner/Editor/Viewer) يقدر يكوبي الرابط ويشاركو -->
+    <button id="copyLinkBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px; background: var(--bg-panel);">
+        <i class="fa-solid fa-link"></i> Copier le lien
+    </button>
     <!-- أزرار صاحب المبيان -->
-    <button id="openManageModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; margin-right: 10px; border-radius: 24px; background: var(--bg-panel);">
+    <button id="openManageModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px; background: var(--bg-panel); position: relative;">
         <i class="fa-solid fa-users"></i> Accès
+        <span id="pendingRequestsBadge" style="display:none; position:absolute; top:-6px; right:-6px; background:#e06b6b; color:#fff; font-size:10px; min-width:16px; height:16px; border-radius:8px; align-items:center; justify-content:center; padding:0 4px;">0</span>
     </button>
     <button id="openShareModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px;">
         <i class="fa-solid fa-share-nodes"></i> Partager
@@ -271,9 +276,26 @@
       <button class="modal-close" id="manageModalClose">✕</button>
     </div>
     <div class="modal-body">
+      <div id="pendingRequestsList" style="margin-bottom: 10px;"></div>
       <div id="membersList" style="max-height: 350px; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
          <p style="text-align: center; color: var(--text-muted); font-size: 14px;">Chargement des collaborateurs...</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Request Access Modal (tiers sans accès) ---------- -->
+<div class="modal-backdrop" id="requestAccessModalBackdrop">
+  <div class="modal" style="width: min(400px, 90vw);">
+    <div class="modal-header">
+      <h2>Demander l'accès</h2>
+      <button class="modal-close" id="requestAccessModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="empty-hint" style="margin-top:0;">Ce graphe est privé. Tu n'y as pas encore accès.</p>
+      <p id="requestAccessGraphTitle" style="font-weight:bold; font-size:16px; margin: 10px 0 20px;"></p>
+      <button id="submitAccessRequestBtn" class="run-btn" style="margin-bottom: 0; border-radius: 24px;">Demander l'accès au propriétaire</button>
+      <p id="requestAccessStatus" style="font-size: 12px; margin-top: 12px; text-align: center; display: none; font-family: var(--font-mono);"></p>
     </div>
   </div>
 </div>

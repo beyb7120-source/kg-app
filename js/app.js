@@ -23,7 +23,7 @@ import { showToast, initThemeToggle } from "./ui.js";
 // Auth & Route Protection (Appwrite)
 // ============================================================
 // حيت حنا فـ module، Appwrite كنجبدوها من window
-const { Client, Account, Databases, Teams, Permission, Role, ID } = window.Appwrite;const client = new Client()
+const { Client, Account, Databases, Teams, Permission, Role, Query, ID } = window.Appwrite;const client = new Client()
     .setEndpoint('https://fra.cloud.appwrite.io/v1')
     .setProject('6a667fe600130a273954');
 
@@ -33,6 +33,19 @@ const teams = new Teams(client);
 
 const DATABASE_ID = '6a6682d6000846a6685e';
 const COLLECTION_ID = 'kg-app'
+// جديد: بدل جوجة فرق (v_/e_) لكل غراف، دابا فريق واحد بالـ roles ديال
+// Appwrite (['viewer'] أو ['editor']) — هادشي كيخلينا نبدلو الدور بـ
+// teams.updateMembership() بلا ما نحيدو/نزيدو membership وبلا ما نصيفطو
+// إيميل جديد فّي مرة.
+function teamIdFor(id) { return "t_" + id; }
+// Collection جديدة: نسخة "عمومية" خفيفة (title/owner فقط، بلا graphData)
+// باش أي مستخدم متصل يقدر يشوف "شكون صاحب هاد الغراف" قبل مايكون عندو
+// membership — هادشي خاصنا باش نبينو له modal "طلب الإذن" بمعلومات
+// صحيحة، بلا ما نكشفو محتوى الغراف نفسو.
+const GRAPH_META_COLLECTION_ID = 'graph-meta';
+// Collection جديدة: طلبات الوصول (access requests) — واحد document
+// لكل طلب، بصلاحيات: صاحب الغراف يقرا/يبدل، الطالب يقرا ديالو بوحدو.
+const ACCESS_REQUESTS_COLLECTION_ID = 'access-requests';
 
 let currentUser = null;
 const urlParams = new URLSearchParams(window.location.search);
@@ -50,11 +63,17 @@ let currentDbId = graphId;
 // على refresh. true بالدفو حيت إيلا مكاينش graphId فالـ URL، يعني رانا
 // غادي نخلقو مبيان جديد ونتا تلقائياً هو Owner ديالو.
 let isOwner = true;
+let currentGraphOwnerId = null;
+let currentUserRole = 'owner'; // 'owner' | 'editor' | 'viewer' — كنحدثوها Live بـ Realtime
 
 function updateAccessButtonsVisibility() {
     document.getElementById('openShareModalBtn').style.display = isOwner ? 'block' : 'none';
     document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
     document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
+    // "Copier le lien" — يبان لكلشي (Owner + Editor + Viewer) ماداملي
+    // كاين غراف محفوظ (currentDbId)، ماشي غير للـ Owner.
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    if (copyLinkBtn) copyLinkBtn.style.display = currentDbId ? 'block' : 'none';
 }
 
 // هادو كيجيو من الإيميل ديال Appwrite
@@ -136,11 +155,20 @@ async function loadGraphFromDB(id) {
         // إظهار وإخفاء الأزرار على حسب شكون اللي فاتح المبيان
         isOwner = doc.userId === currentUser.$id;
         updateAccessButtonsVisibility();
+        currentGraphOwnerId = doc.userId;
+        subscribeToOwnMembership(id);
+        if (isOwner) startPendingRequestsWatch(id);
 
         drawGraph();
     } catch (err) {
         console.error("Erreur chargement graphe:", err);
-        showToast("Impossible de charger ce graphe. Vous n'avez peut-être pas les droits.", "error");
+        // إيلا كان 401/403 (ماعندكش membership)، بدل نوقفو هنا بغير error،
+        // كنجربو نبينو "طلب الإذن" (اعتماداً على الوثيقة العمومية graph-meta).
+        if (err.code === 401 || err.code === 403) {
+            await showRequestAccessModal(id);
+        } else {
+            showToast("Impossible de charger ce graphe.", "error");
+        }
         emptyState.style.display = "block";
         emptyState.textContent = "Impossible de charger ce graphe.";
     }
@@ -631,6 +659,11 @@ async function persistGraphToDatabase() {
     } else {
       await databases.updateDocument(DATABASE_ID, COLLECTION_ID, currentDbId, payload);
     }
+    // نحدثو معاه نسخة "عمومية" خفيفة (graph-meta) — title + owner فقط،
+    // بلا graphData — باش أي مستخدم متصل (واخا مامعندوش membership)
+    // يقدر يشوف "شكون صاحب هاد الغراف" ويطلب الإذن، بلا ما يشوف المحتوى.
+    // نديرو هادشي بلا ما نوقفو الحفظ الرئيسي إيلا فشل (ماشي critique).
+    upsertGraphMeta(graphTitle).catch(e => console.error("graph-meta upsert:", e));
     // Save نجحت — نمسحو أي علامة "خطر، عندك تعديلات ماتسجلاتش" باقية.
     hasUnsavedFailure = false;
   } catch (err) {
@@ -639,6 +672,26 @@ async function persistGraphToDatabase() {
     // هوما اللي كيقرروا شنو يبينو للمستخدم بالضبط.
     hasUnsavedFailure = true;
     throw err;
+  }
+}
+
+// نفس $id ديال الغراف الرئيسي، باش الوصول ليها سهل ومباشر (getDocument
+// بلا حاجة لـ query). عمومية القراءة (Role.users()) خاصها تنعطى مرة
+// واحدة فـ Appwrite Console (collection-level) — شوف تعليمات الإعداد.
+async function upsertGraphMeta(title) {
+  const payload = { title, ownerId: currentUser.$id, icon: '📄' };
+  try {
+    await databases.createDocument(DATABASE_ID, GRAPH_META_COLLECTION_ID, currentDbId, payload, [
+      Permission.read(Role.users()),      // أي مستخدم متصل يقرا title/owner فقط
+      Permission.write(Role.user(currentUser.$id)),
+    ]);
+  } catch (e) {
+    if (e.code === 409) {
+      // كاينة ديجا، غير update
+      await databases.updateDocument(DATABASE_ID, GRAPH_META_COLLECTION_ID, currentDbId, payload);
+    } else {
+      throw e;
+    }
   }
 }
 
@@ -1317,19 +1370,60 @@ shareModalBackdrop.addEventListener("click", (e) => {
     if (e.target === shareModalBackdrop) closeShareModal();
 });
 
+// ============================================================
+// "Copier le lien" — كلشي (Owner/Editor/Viewer) يقدر يشارك الرابط.
+// الرابط ماكيعطيش access مباشر: الطرف الثالث خاصو signup/signin، ومن
+// بعد خاصو يطلب الإذن (شوف showRequestAccessModal) — شوف updateAccessButtonsVisibility.
+// ============================================================
+const copyLinkBtn = document.getElementById("copyLinkBtn");
+if (copyLinkBtn) {
+    copyLinkBtn.addEventListener("click", async () => {
+        if (!currentDbId) return;
+        const link = window.location.origin + "/index.html?graphId=" + currentDbId;
+        try {
+            await navigator.clipboard.writeText(link);
+            showToast("Lien copié dans le presse-papiers.", "success");
+        } catch {
+            prompt("Copie ce lien :", link);
+        }
+    });
+}
 
 // ============================================================
-// Logique de Partage (Appwrite Teams & Permissions) - SANS ERREUR 409
+// Logique de Partage (Appwrite Teams & Permissions) — un seul
+// Team par graphe (t_<graphId>), rôle stocké dans membership.roles
+// (['viewer'] ou ['editor']). Ça permet de changer le rôle plus tard
+// avec teams.updateMembership() SANS recréer de membership et donc
+// SANS renvoyer d'email d'invitation (voir changeRole plus bas).
 // ============================================================
+async function ensureShareTeam(graphId) {
+    const teamId = teamIdFor(graphId);
+    try { await teams.create(teamId, "Graphe: " + graphId); }
+    catch (e) { if (e.code !== 409) throw e; }
+
+    await databases.updateDocument(
+        DATABASE_ID,
+        COLLECTION_ID,
+        graphId,
+        undefined,
+        [
+            Permission.read(Role.user(currentUser.$id)),
+            Permission.update(Role.user(currentUser.$id)),
+            Permission.delete(Role.user(currentUser.$id)),
+            Permission.read(Role.team(teamId)),
+            Permission.update(Role.team(teamId, ["editor"])),
+        ]
+    );
+    return teamId;
+}
+
 const confirmShareBtn = document.getElementById("confirmShareBtn");
 const shareStatusMsg = document.getElementById("shareStatusMsg");
 
 confirmShareBtn.addEventListener("click", async () => {
     const email = document.getElementById("shareEmail").value.trim();
-    const role = document.getElementById("shareRole").value; 
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentGraphId = urlParams.get('graphId');
+    const role = document.getElementById("shareRole").value;
+    const currentGraphId = new URLSearchParams(window.location.search).get('graphId');
 
     if (!email || !currentGraphId) {
         alert("Erreur: Adresse email ou ID du graphe manquant.");
@@ -1342,51 +1436,18 @@ confirmShareBtn.addEventListener("click", async () => {
     confirmShareBtn.disabled = true;
 
     try {
-        const viewerTeamId = "v_" + currentGraphId;
-        const editorTeamId = "e_" + currentGraphId;
-
-        // كنحاولو نكرييو الفريق، وإيلا عطانا إيرور 409 (يعني ديجا كاين) كنتجاهلوه
-        try { await teams.create(viewerTeamId, "Viewers - Graphe: " + currentGraphId); } 
-        catch (e) { if(e.code !== 409) throw e; }
-
-        try { await teams.create(editorTeamId, "Editors - Graphe: " + currentGraphId); } 
-        catch (e) { if(e.code !== 409) throw e; }
-
-        await databases.updateDocument(
-            DATABASE_ID, 
-            COLLECTION_ID, 
-            currentGraphId, 
-            undefined, 
-            [
-                Permission.read(Role.user(currentUser.$id)),
-                Permission.update(Role.user(currentUser.$id)),
-                Permission.delete(Role.user(currentUser.$id)),
-                Permission.read(Role.team(viewerTeamId)),  
-                Permission.read(Role.team(editorTeamId)),  
-                Permission.update(Role.team(editorTeamId)) 
-            ]
-        );
-
+        const teamId = await ensureShareTeam(currentGraphId);
         const redirectUrl = window.location.origin + '/index.html?graphId=' + currentGraphId;
-        const targetTeamId = role === 'viewer' ? viewerTeamId : editorTeamId;
 
-        await teams.createMembership(
-            targetTeamId,     
-            [],               
-            email,            
-            undefined,        
-            undefined,        
-            redirectUrl,      
-            undefined         
-        );
+        await teams.createMembership(teamId, [role], email, undefined, undefined, redirectUrl, undefined);
 
-        shareStatusMsg.style.color = "#8fbf7f"; 
+        shareStatusMsg.style.color = "#8fbf7f";
         shareStatusMsg.textContent = `Invitation envoyée avec succès à ${email} en tant que ${role} !`;
         document.getElementById("shareEmail").value = "";
 
     } catch (err) {
         console.error("Erreur de partage:", err);
-        shareStatusMsg.style.color = "#e06b6b"; 
+        shareStatusMsg.style.color = "#e06b6b";
         shareStatusMsg.textContent = "Erreur: " + err.message;
     } finally {
         confirmShareBtn.disabled = false;
@@ -1406,6 +1467,7 @@ const membersList = document.getElementById("membersList");
 openManageModalBtn.addEventListener("click", async () => {
     manageModalBackdrop.classList.add("open");
     await loadCollaborators();
+    renderPendingRequests();
 });
 
 manageModalClose.addEventListener("click", () => manageModalBackdrop.classList.remove("open"));
@@ -1413,36 +1475,22 @@ manageModalBackdrop.addEventListener("click", (e) => {
     if (e.target === manageModalBackdrop) manageModalBackdrop.classList.remove("open");
 });
 
-// دالة لجلب وعرض الأعضاء (المدعوين فقط بشكل دقيق)
+// دالة لجلب وعرض الأعضاء (فريق واحد دابا، بلا v_/e_)
 async function loadCollaborators() {
     membersList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement...</p>';
-    const urlParams = new URLSearchParams(window.location.search);
-    const currentGraphId = urlParams.get('graphId');
-    
+    const currentGraphId = new URLSearchParams(window.location.search).get('graphId');
+    const teamId = teamIdFor(currentGraphId);
+
     try {
-        let vTeam = { memberships: [] };
-        let eTeam = { memberships: [] };
+        let team = { memberships: [] };
+        try { team = await teams.listMemberships(teamId); } catch (e) {}
 
-        try { vTeam = await teams.listMemberships("v_" + currentGraphId); } catch(e) {}
-        try { eTeam = await teams.listMemberships("e_" + currentGraphId); } catch(e) {}
-        
-        let allMembers = [];
-
-        // الفلتر السحري: أي عضو ماعنوش دور "owner" راه ضيف (مدعو)
-        vTeam.memberships.forEach(m => {
-            if (!m.roles.includes('owner')) {
-                allMembers.push({ ...m, role: 'viewer', teamId: "v_" + currentGraphId });
-            }
-        });
-
-        eTeam.memberships.forEach(m => {
-            if (!m.roles.includes('owner')) {
-                allMembers.push({ ...m, role: 'editor', teamId: "e_" + currentGraphId });
-            }
-        });
+        // الفلتر السحري: أي عضو ماعندوش دور "owner" راه ضيف (مدعو)
+        const allMembers = team.memberships
+            .filter(m => !m.roles.includes('owner'))
+            .map(m => ({ ...m, role: m.roles.find(r => r !== 'owner') || 'viewer', teamId }));
 
         let html = '';
-
         if (allMembers.length === 0) {
             html = '<p style="text-align:center; color:var(--text-muted); font-size:13px;">Aucun collaborateur pour le moment.</p>';
         } else {
@@ -1454,12 +1502,7 @@ async function loadCollaborators() {
                 // كنعرضو نص بديل للعرض غير، ماشي كنستعملوه كإيميل فالـ API.
                 const realEmail = member.userEmail || "";
                 const userDisplay = realEmail || member.userName || "Utilisateur invité (email masqué)";
-
-                // إيلا مافيناش إيميل حقيقي، زر "Inverser" كيبقى معطل باش
-                // مايعطيش error 400 (Invalid email param) فـ Appwrite.
-                const inverserAttrs = realEmail
-                    ? `onclick="changeRole('${member.$id}', '${realEmail}', '${member.role}', '${currentGraphId}')"`
-                    : `disabled title="Email masqué par Appwrite (active-le dans Auth > Security > Memberships privacy)"`;
+                const nextRole = member.role === 'viewer' ? 'editor' : 'viewer';
 
                 html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
@@ -1468,10 +1511,10 @@ async function loadCollaborators() {
                         <span style="font-size:12px; color:var(--text-muted);">Rôle: <strong style="text-transform:capitalize; color:var(--text-primary);">${member.role}</strong> ${status}</span>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button ${inverserAttrs} class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
+                        <button onclick="changeRole('${teamId}', '${member.$id}', '${nextRole}')" class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
                             <i class="fa-solid fa-right-left"></i> Inverser
                         </button>
-                        <button onclick="revokeAccess('${member.teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px; cursor:pointer;" title="Supprimer l'accès">
+                        <button onclick="revokeAccess('${teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px; cursor:pointer;" title="Supprimer l'accès">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -1486,41 +1529,26 @@ async function loadCollaborators() {
 }
 
 // دالة لحذف الصلاحية (الطرد)
-window.revokeAccess = async function(teamId, membershipId) {
-    if(!confirm("Voulez-vous vraiment retirer l'accès à cet utilisateur ?")) return;
+window.revokeAccess = async function (teamId, membershipId) {
+    if (!confirm("Voulez-vous vraiment retirer l'accès à cet utilisateur ?")) return;
     try {
         await teams.deleteMembership(teamId, membershipId);
         showToast("Accès révoqué avec succès.", "success");
-        await loadCollaborators(); // تحديث القائمة
+        await loadCollaborators();
     } catch (err) {
         alert("Erreur: " + err.message);
     }
 };
 
-// دالة لتغيير الدور (من Viewer لـ Editor والعكس)
-window.changeRole = async function(oldMembershipId, email, currentRole, graphId) {
-    // حراسة إضافية: إيلا وصلنا هنا بإيميل ماشي صحيح (bug قديم أو نداء يدوي)،
-    // نوقفو دغيا بلا ما نديرو الطلب لـ Appwrite (خاصنا error 400 واضح
-    // بدل من "Invalid `email` param" غامضة فالـ console).
-    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!isValidEmail) {
-        alert("Impossible de changer le rôle : l'email de cet utilisateur n'est pas disponible (vérifie le réglage \"Memberships privacy\" dans Appwrite Console > Auth > Security).");
-        return;
-    }
-
-    if(!confirm(`Voulez-vous changer le rôle de ${email} ? (Un nouvel email lui sera envoyé)`)) return;
-    
-    const oldTeamId = currentRole === 'viewer' ? "v_" + graphId : "e_" + graphId;
-    const newTeamId = currentRole === 'viewer' ? "e_" + graphId : "v_" + graphId;
-    const redirectUrl = window.location.origin + '/index.html?graphId=' + graphId;
-
+// دالة لتغيير الدور — دابا كتبدل roles ديال membership لي كاين ديجا
+// (بلا حذف/زيادة، بلا إيميل جديد). Appwrite Realtime كيبلغ الشخص هذاك
+// حياً (شوف subscribeToOwnMembership) وكيتبدلو ليه الصلاحيات فالـ UI
+// ديالو بلا ما يدير refresh.
+window.changeRole = async function (teamId, membershipId, newRole) {
+    if (!confirm(`Voulez-vous changer le rôle de cet utilisateur en "${newRole}" ?`)) return;
     try {
-        // 1. مسح من الفريق القديم
-        await teams.deleteMembership(oldTeamId, oldMembershipId);
-        // 2. إضافة للفريق الجديد
-        await teams.createMembership(newTeamId, [], email, undefined, undefined, redirectUrl, undefined);
-        
-        showToast("Rôle mis à jour, invitation envoyée.", "success");
+        await teams.updateMembership(teamId, membershipId, [newRole]);
+        showToast("Rôle mis à jour instantanément.", "success");
         await loadCollaborators();
     } catch (err) {
         alert("Erreur lors du changement de rôle: " + err.message);
@@ -1528,46 +1556,237 @@ window.changeRole = async function(oldMembershipId, email, currentRole, graphId)
 };
 
 // ============================================================
+// Realtime — كل مستخدم (owner واخا collaborateur) كيتبع membership
+// ديالو هو فالفريق ديال هاد الغراف، باش إيلا Owner بدل ليه الدور،
+// الصلاحيات و الأيقونة يتبدلو حياً بلا refresh.
+// ============================================================
+let unsubscribeMembership = null;
+function subscribeToOwnMembership(graphId) {
+    if (unsubscribeMembership) { unsubscribeMembership(); unsubscribeMembership = null; }
+    if (isOwner) { currentUserRole = 'owner'; return; } // Owner ديما كامل الصلاحيات
+
+    const teamId = teamIdFor(graphId);
+    // نجيبو الدور الحالي ديالنا أول مرة (بلا نتسناو حدث Realtime).
+    teams.listMemberships(teamId).then(res => {
+        const mine = res.memberships.find(m => m.userId === currentUser.$id);
+        if (mine) applyOwnRole(mine.roles.find(r => r !== 'owner') || 'viewer');
+    }).catch(() => {});
+
+    unsubscribeMembership = client.subscribe(`teams.${teamId}.memberships`, (event) => {
+        const m = event.payload;
+        if (m.userId !== currentUser.$id) return; // حدث خاص بشخص آخر، ماشي حنا
+        if (event.events.some(e => e.endsWith('.delete'))) {
+            // Owner حيد الصلاحية ديالنا نيشان
+            showToast("Le propriétaire a révoqué votre accès à ce graphe.", "error");
+            window.location.href = "dashboard.html";
+            return;
+        }
+        applyOwnRole(m.roles.find(r => r !== 'owner') || 'viewer');
+        showToast(`Ton rôle a changé : tu es maintenant ${currentUserRole}.`, "success");
+    });
+}
+
+// دالة مركزية كتبدل currentUserRole وكتفعل/كتعطل عناصر التعديل فالـ UI
+// على حساب الدور الجديد (نفس المنطق لأي نوع تعديل: rename, delete node/edge...).
+function applyOwnRole(role) {
+    currentUserRole = role; // 'viewer' | 'editor'
+    const canEdit = currentUserRole === 'editor' || isOwner;
+    document.body.classList.toggle('read-only-mode', !canEdit);
+    // أي زر/عنصر عندو class "editor-only" كيتفعل/كيتعطل تلقائياً هنا —
+    // هكذا ماخصناش نبدلو كل دالة تعديل واحدة واحدة فالكود.
+    document.querySelectorAll('.editor-only').forEach(el => {
+        el.disabled = !canEdit;
+        el.style.opacity = canEdit ? '1' : '0.4';
+        el.style.pointerEvents = canEdit ? 'auto' : 'none';
+    });
+}
+
+// ============================================================
 // Logique pour le bouton "Quitter le graphe" (Guests)
 // ============================================================
 const leaveGraphBtn = document.getElementById("leaveGraphBtn");
 if (leaveGraphBtn) {
     leaveGraphBtn.addEventListener("click", async () => {
-        if(!confirm("Voulez-vous vraiment quitter ce graphe et perdre votre accès ?")) return;
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const currentGraphId = urlParams.get('graphId');
-        
+        if (!confirm("Voulez-vous vraiment quitter ce graphe et perdre votre accès ?")) return;
+        const currentGraphId = new URLSearchParams(window.location.search).get('graphId');
+        const teamId = teamIdFor(currentGraphId);
         try {
-            // كضيف كنشوفو واش حنا ف v ولا e باش نلقاو membershipId ديالنا
-            let userTeamId = null;
-            let userMembershipId = null;
-
-            try {
-                const vMembers = await teams.listMemberships('v_' + currentGraphId);
-                const mem = vMembers.memberships.find(m => m.userId === currentUser.$id);
-                if(mem) { userTeamId = 'v_' + currentGraphId; userMembershipId = mem.$id; }
-            } catch(e) {}
-
-            if(!userMembershipId) {
-                try {
-                    const eMembers = await teams.listMemberships('e_' + currentGraphId);
-                    const mem = eMembers.memberships.find(m => m.userId === currentUser.$id);
-                    if(mem) { userTeamId = 'e_' + currentGraphId; userMembershipId = mem.$id; }
-                } catch(e) {}
-            }
-
-            if(userMembershipId) {
-                // نحدفو راسنا من الفريق
-                await teams.deleteMembership(userTeamId, userMembershipId);
+            const members = await teams.listMemberships(teamId);
+            const mine = members.memberships.find(m => m.userId === currentUser.$id);
+            if (mine) {
+                await teams.deleteMembership(teamId, mine.$id);
                 alert("Vous avez quitté le graphe.");
                 window.location.href = "dashboard.html";
             } else {
                 showToast("Erreur: Impossible de trouver votre accès.", "error");
             }
-        } catch(err) {
+        } catch (err) {
             console.error("Erreur Quitter:", err);
             showToast("Erreur lors de la sortie.", "error");
         }
     });
 }
+
+// ============================================================
+// Demande d'accès (tiers sans membership) — أوتوماتيكياً كتبان ملي
+// getDocument يرجع 401/403 فـ loadGraphFromDB.
+// ============================================================
+const requestAccessModalBackdrop = document.getElementById("requestAccessModalBackdrop");
+
+async function showRequestAccessModal(graphId) {
+    if (!requestAccessModalBackdrop) return;
+    const titleEl = document.getElementById("requestAccessGraphTitle");
+    const statusEl = document.getElementById("requestAccessStatus");
+    const btn = document.getElementById("submitAccessRequestBtn");
+    statusEl.style.display = "none";
+    btn.style.display = "inline-block";
+    btn.disabled = false;
+
+    let meta;
+    try {
+        meta = await databases.getDocument(DATABASE_ID, GRAPH_META_COLLECTION_ID, graphId);
+    } catch {
+        titleEl.textContent = "Ce graphe n'existe pas ou n'est plus disponible.";
+        btn.style.display = "none";
+        requestAccessModalBackdrop.classList.add("open");
+        return;
+    }
+
+    titleEl.textContent = `"${meta.title}"`;
+    requestAccessModalBackdrop.classList.add("open");
+
+    // إيلا سبق وطلبنا (pending)، مانخليوش نعاودو نطلبو مرتين
+    let existing = null;
+    try {
+        const res = await databases.listDocuments(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, [
+            Query.equal('graphId', graphId),
+            Query.equal('requesterId', currentUser.$id),
+        ]);
+        existing = res.documents.find(d => d.status === 'pending') || null;
+    } catch (e) { console.error(e); }
+
+    if (existing) {
+        statusEl.style.display = "block";
+        statusEl.style.color = "var(--text-muted)";
+        statusEl.textContent = "Ta demande est déjà en attente d'approbation du propriétaire.";
+        btn.style.display = "none";
+        return;
+    }
+
+    btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+            await databases.createDocument(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, ID.unique(), {
+                graphId,
+                ownerId: meta.ownerId,
+                requesterId: currentUser.$id,
+                requesterEmail: currentUser.email,
+                requesterName: currentUser.name || currentUser.email,
+                status: 'pending',
+            }, [
+                Permission.read(Role.user(meta.ownerId)),
+                Permission.update(Role.user(meta.ownerId)),
+                Permission.read(Role.user(currentUser.$id)),
+            ]);
+            statusEl.style.display = "block";
+            statusEl.style.color = "#8fbf7f";
+            statusEl.textContent = "Demande envoyée ! Tu recevras un email si le propriétaire l'accepte.";
+            btn.style.display = "none";
+        } catch (err) {
+            statusEl.style.display = "block";
+            statusEl.style.color = "#e06b6b";
+            statusEl.textContent = "Erreur: " + err.message;
+            btn.disabled = false;
+        }
+    };
+}
+
+const requestAccessModalClose = document.getElementById("requestAccessModalClose");
+if (requestAccessModalClose) {
+    requestAccessModalClose.addEventListener("click", () => requestAccessModalBackdrop.classList.remove("open"));
+}
+
+// ============================================================
+// Panneau "Demandes en attente" (Owner) — badge + liste live (Realtime)
+// ============================================================
+let pendingRequestsCache = [];
+let unsubscribeRequests = null;
+
+async function startPendingRequestsWatch(graphId) {
+    if (unsubscribeRequests) { unsubscribeRequests(); unsubscribeRequests = null; }
+
+    const refresh = async () => {
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, [
+                Query.equal('graphId', graphId),
+                Query.equal('status', 'pending'),
+            ]);
+            pendingRequestsCache = res.documents;
+            renderPendingRequests();
+        } catch (e) { console.error("pending requests:", e); }
+    };
+    await refresh();
+
+    unsubscribeRequests = client.subscribe(
+        `databases.${DATABASE_ID}.collections.${ACCESS_REQUESTS_COLLECTION_ID}.documents`,
+        (event) => {
+            if (event.payload.graphId !== graphId) return;
+            refresh();
+        }
+    );
+}
+
+function renderPendingRequests() {
+    const badge = document.getElementById("pendingRequestsBadge");
+    if (badge) {
+        badge.textContent = pendingRequestsCache.length;
+        badge.style.display = pendingRequestsCache.length ? 'inline-flex' : 'none';
+    }
+    const listEl = document.getElementById("pendingRequestsList");
+    if (!listEl) return;
+    if (pendingRequestsCache.length === 0) {
+        listEl.innerHTML = '';
+        return;
+    }
+    listEl.innerHTML = `<p style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-family:var(--font-mono); margin:0 0 8px;">Demandes en attente</p>` +
+        pendingRequestsCache.map(req => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--accent-cyan); margin-bottom:10px;">
+                <div style="display:flex; flex-direction:column; gap:4px;">
+                    <span style="font-weight:bold; font-size:14px;">${escapeHtml(req.requesterName || req.requesterEmail)}</span>
+                    <span style="font-size:12px; color:var(--text-muted);">${escapeHtml(req.requesterEmail)}</span>
+                </div>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <select id="role-${req.$id}" style="border-radius:8px; padding:4px 6px; background:var(--bg-panel); color:var(--text-primary); border:1px solid var(--border);">
+                        <option value="viewer">Viewer</option>
+                        <option value="editor">Editor</option>
+                    </select>
+                    <button onclick="acceptAccessRequest('${req.$id}')" class="secondary-btn" style="padding:6px 10px; font-size:12px; border-radius:8px; color:#8fbf7f;" title="Accepter"><i class="fa-solid fa-check"></i></button>
+                    <button onclick="rejectAccessRequest('${req.$id}')" class="danger-btn" style="padding:6px 10px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px;" title="Refuser"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>`).join('');
+}
+
+window.acceptAccessRequest = async function (requestId) {
+    const req = pendingRequestsCache.find(r => r.$id === requestId);
+    if (!req) return;
+    const role = document.getElementById(`role-${requestId}`)?.value || 'viewer';
+    try {
+        const teamId = await ensureShareTeam(req.graphId);
+        const redirectUrl = window.location.origin + '/index.html?graphId=' + req.graphId;
+        await teams.createMembership(teamId, [role], req.requesterEmail, undefined, undefined, redirectUrl, undefined);
+        await databases.updateDocument(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, requestId, { status: 'accepted' });
+        showToast(`Accès accordé à ${req.requesterEmail} en tant que ${role}.`, "success");
+        await loadCollaborators();
+    } catch (err) {
+        alert("Erreur: " + err.message);
+    }
+};
+
+window.rejectAccessRequest = async function (requestId) {
+    try {
+        await databases.updateDocument(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, requestId, { status: 'rejected' });
+        showToast("Demande refusée.", "success");
+    } catch (err) {
+        alert("Erreur: " + err.message);
+    }
+};
