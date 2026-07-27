@@ -1761,9 +1761,10 @@ async function showRequestAccessModal(graphId) {
                 requesterName: currentUser.name || currentUser.email,
                 status: 'pending',
             }, [
-                Permission.read(Role.user(meta.ownerId)),
-                Permission.update(Role.user(meta.ownerId)),
-                Permission.read(Role.user(currentUser.$id)),
+                // التعديل لي خصك دير هو هذا:
+                Permission.read(Role.users()),    // أي واحد مكونيكطي يقدر يقرا (باش مول الغراف يشوف الطلب)
+                Permission.update(Role.users()),  // أي واحد مكونيكطي يقدر يبدل (باش مول الغراف يقدر يدير accepted)
+                Permission.delete(Role.user(currentUser.$id)) // مول الطلب هو الوحيد لي يقدر يمسحو
             ]);
             statusEl.style.display = "block";
             statusEl.style.color = "#8fbf7f";
