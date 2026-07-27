@@ -1369,8 +1369,7 @@ manageModalBackdrop.addEventListener("click", (e) => {
     if (e.target === manageModalBackdrop) manageModalBackdrop.classList.remove("open");
 });
 
-// دالة لجلب وعرض الأعضاء
-// دالة لجلب وعرض الأعضاء بدون إيرورات 404
+// دالة لجلب وعرض الأعضاء (المدعوين فقط)
 async function loadCollaborators() {
     membersList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement...</p>';
     const urlParams = new URLSearchParams(window.location.search);
@@ -1380,31 +1379,42 @@ async function loadCollaborators() {
         let vTeam = { memberships: [] };
         let eTeam = { memberships: [] };
 
-        // كنتجاهلو إيرور 404 بصمت باش ما يوقفش لينا الكود
         try { vTeam = await teams.listMemberships("v_" + currentGraphId); } catch(e) {}
         try { eTeam = await teams.listMemberships("e_" + currentGraphId); } catch(e) {}
         
+        let allMembers = [];
+
+        // كنجبدو Viewers وكنحيدو منهم مول المبيان (نتا)
+        vTeam.memberships.forEach(m => {
+            if (m.userId !== currentUser.$id) {
+                allMembers.push({ ...m, role: 'viewer', teamId: "v_" + currentGraphId });
+            }
+        });
+
+        // كنجبدو Editors وكنحيدو منهم مول المبيان (نتا)
+        eTeam.memberships.forEach(m => {
+            if (m.userId !== currentUser.$id) {
+                allMembers.push({ ...m, role: 'editor', teamId: "e_" + currentGraphId });
+            }
+        });
+
         let html = '';
-        const allMembers = [
-            ...vTeam.memberships.map(m => ({ ...m, role: 'viewer', teamId: "v_" + currentGraphId })),
-            ...eTeam.memberships.map(m => ({ ...m, role: 'editor', teamId: "e_" + currentGraphId }))
-        ];
 
         if (allMembers.length === 0) {
             html = '<p style="text-align:center; color:var(--text-muted); font-size:13px;">Aucun collaborateur pour le moment.</p>';
         } else {
             allMembers.forEach(member => {
                 const status = member.confirm ? '<span style="color:#8fbf7f; font-size:11px;">(Actif)</span>' : '<span style="color:#e06b6b; font-size:11px;">(En attente)</span>';
-                
-                // هادا هو التصميم اللي طلبتي: الإيميل والدور، عاد الأزرار
+                const userDisplay = member.userEmail || "Email inconnu"; // كنجبدو الإيميل نيشان
+
                 html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
                     <div style="display:flex; flex-direction:column; gap:4px;">
-                        <span style="font-weight:bold; font-size:14px; color:var(--text-primary);">${member.userEmail}</span>
+                        <span style="font-weight:bold; font-size:14px; color:var(--text-primary);">${userDisplay}</span>
                         <span style="font-size:12px; color:var(--text-muted);">Rôle: <strong style="text-transform:capitalize; color:var(--text-primary);">${member.role}</strong> ${status}</span>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button onclick="changeRole('${member.$id}', '${member.userEmail}', '${member.role}', '${currentGraphId}')" class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
+                        <button onclick="changeRole('${member.$id}', '${userDisplay}', '${member.role}', '${currentGraphId}')" class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
                             <i class="fa-solid fa-right-left"></i> Inverser
                         </button>
                         <button onclick="revokeAccess('${member.teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px; cursor:pointer;" title="Supprimer l'accès">
