@@ -512,7 +512,16 @@ runBtn.addEventListener("click", async () => {
 
     emptyState.style.display = "none";
     drawGraph();
+// (هادو سطورة غتلقاهم ديجا عندك)
+    emptyState.style.display = "none";
+    drawGraph();
     showToast(mergeMode ? "Source ajoutée au graphe." : "Graphe généré.", "success");
+    
+    // 🔥 زيد هاد 3 سطورة هنا باش يبانو الأزرار نيشان بعد الاستخراج
+    document.getElementById('openShareModalBtn').style.display = 'block';
+    document.getElementById('openManageModalBtn').style.display = 'block';
+    document.getElementById('leaveGraphBtn').style.display = 'none';
+    
   } catch (err) {
     setStage(err.message, "error");
     showToast(err.message, "error");
@@ -1369,7 +1378,7 @@ manageModalBackdrop.addEventListener("click", (e) => {
     if (e.target === manageModalBackdrop) manageModalBackdrop.classList.remove("open");
 });
 
-// دالة لجلب وعرض الأعضاء (المدعوين فقط)
+// دالة لجلب وعرض الأعضاء (المدعوين فقط بشكل دقيق)
 async function loadCollaborators() {
     membersList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement...</p>';
     const urlParams = new URLSearchParams(window.location.search);
@@ -1384,16 +1393,15 @@ async function loadCollaborators() {
         
         let allMembers = [];
 
-        // كنجبدو Viewers وكنحيدو منهم مول المبيان (نتا)
+        // الفلتر السحري: أي عضو ماعنوش دور "owner" راه ضيف (مدعو)
         vTeam.memberships.forEach(m => {
-            if (m.userId !== currentUser.$id) {
+            if (!m.roles.includes('owner')) {
                 allMembers.push({ ...m, role: 'viewer', teamId: "v_" + currentGraphId });
             }
         });
 
-        // كنجبدو Editors وكنحيدو منهم مول المبيان (نتا)
         eTeam.memberships.forEach(m => {
-            if (m.userId !== currentUser.$id) {
+            if (!m.roles.includes('owner')) {
                 allMembers.push({ ...m, role: 'editor', teamId: "e_" + currentGraphId });
             }
         });
@@ -1405,7 +1413,9 @@ async function loadCollaborators() {
         } else {
             allMembers.forEach(member => {
                 const status = member.confirm ? '<span style="color:#8fbf7f; font-size:11px;">(Actif)</span>' : '<span style="color:#e06b6b; font-size:11px;">(En attente)</span>';
-                const userDisplay = member.userEmail || "Email inconnu"; // كنجبدو الإيميل نيشان
+                
+                // جلب الإيميل أو عرض نص بديل يلا كانت الدعوة باقا معلقة فالسيرفور
+                const userDisplay = member.userEmail || member.userName || "Utilisateur invité";
 
                 html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
