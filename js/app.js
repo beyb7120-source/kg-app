@@ -45,6 +45,18 @@ const graphId = urlParams.get('graphId');
 let currentDbId = graphId;
 // ... الكود اللي الفوق
 
+// كنتبعو شكون Owner ديال المبيان المفتوح دابا، باش نقدرو نبينو/نخبيو
+// الأزرار (Partager/Accès/Quitter) بشكل صحيح فكل الحالات — بلا مانعتمدو
+// على refresh. true بالدفو حيت إيلا مكاينش graphId فالـ URL، يعني رانا
+// غادي نخلقو مبيان جديد ونتا تلقائياً هو Owner ديالو.
+let isOwner = true;
+
+function updateAccessButtonsVisibility() {
+    document.getElementById('openShareModalBtn').style.display = isOwner ? 'block' : 'none';
+    document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
+    document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
+}
+
 // هادو كيجيو من الإيميل ديال Appwrite
 const teamIdParam = urlParams.get('teamId');
 const membershipIdParam = urlParams.get('membershipId');
@@ -122,11 +134,9 @@ async function loadGraphFromDB(id) {
         arrangeGraphBtn.disabled = false;
 
         // إظهار وإخفاء الأزرار على حسب شكون اللي فاتح المبيان
-        const isOwner = doc.userId === currentUser.$id;
-        document.getElementById('openShareModalBtn').style.display = isOwner ? 'block' : 'none';
-        document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
-        document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
-        
+        isOwner = doc.userId === currentUser.$id;
+        updateAccessButtonsVisibility();
+
         drawGraph();
     } catch (err) {
         console.error("Erreur chargement graphe:", err);
@@ -512,16 +522,17 @@ runBtn.addEventListener("click", async () => {
 
     emptyState.style.display = "none";
     drawGraph();
-// (هادو سطورة غتلقاهم ديجا عندك)
-    emptyState.style.display = "none";
-    drawGraph();
     showToast(mergeMode ? "Source ajoutée au graphe." : "Graphe généré.", "success");
-    
-    // 🔥 زيد هاد 3 سطورة هنا باش يبانو الأزرار نيشان بعد الاستخراج
-    document.getElementById('openShareModalBtn').style.display = 'block';
-    document.getElementById('openManageModalBtn').style.display = 'block';
-    document.getElementById('leaveGraphBtn').style.display = 'none';
-    
+
+    // ماشي مجرد "زيد بلوك ديال 3 سطورة هنا" — خاصنا نعرفو واش نتا Owner
+    // ديال هاد المبيان قبل مانبينو الأزرار. إيلا كنت غير Editor عندك
+    // إمكانية تدير merge/ajouter source فمبيان حد آخر، إيلا مساويناش هاد
+    // isOwner، الأزرار غادي يبانو غلط (Partager/Accès لـ Editor بدل
+    // Quitter). isOwner كتبقى true بالدفو غير فحالة مبيان جديد (ماكانش
+    // graphId من قبل) لي أنت خالقه، وتتبدل فـ loadGraphFromDB إيلا كنتي
+    // فاتح مبيان كاين من قبل.
+    updateAccessButtonsVisibility();
+
   } catch (err) {
     setStage(err.message, "error");
     showToast(err.message, "error");
