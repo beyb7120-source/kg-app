@@ -1424,9 +1424,18 @@ async function loadCollaborators() {
         } else {
             allMembers.forEach(member => {
                 const status = member.confirm ? '<span style="color:#8fbf7f; font-size:11px;">(Actif)</span>' : '<span style="color:#e06b6b; font-size:11px;">(En attente)</span>';
-                
-                // جلب الإيميل أو عرض نص بديل يلا كانت الدعوة باقا معلقة فالسيرفور
-                const userDisplay = member.userEmail || member.userName || "Utilisateur invité";
+
+                // جلب الإيميل الحقيقي — إيلا Appwrite رجعو فارغ (غالباً حيت
+                // "Memberships privacy" مفعّل فـ Console: Auth > Security)
+                // كنعرضو نص بديل للعرض غير، ماشي كنستعملوه كإيميل فالـ API.
+                const realEmail = member.userEmail || "";
+                const userDisplay = realEmail || member.userName || "Utilisateur invité (email masqué)";
+
+                // إيلا مافيناش إيميل حقيقي، زر "Inverser" كيبقى معطل باش
+                // مايعطيش error 400 (Invalid email param) فـ Appwrite.
+                const inverserAttrs = realEmail
+                    ? `onclick="changeRole('${member.$id}', '${realEmail}', '${member.role}', '${currentGraphId}')"`
+                    : `disabled title="Email masqué par Appwrite (active-le dans Auth > Security > Memberships privacy)"`;
 
                 html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
@@ -1435,7 +1444,7 @@ async function loadCollaborators() {
                         <span style="font-size:12px; color:var(--text-muted);">Rôle: <strong style="text-transform:capitalize; color:var(--text-primary);">${member.role}</strong> ${status}</span>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button onclick="changeRole('${member.$id}', '${userDisplay}', '${member.role}', '${currentGraphId}')" class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
+                        <button ${inverserAttrs} class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
                             <i class="fa-solid fa-right-left"></i> Inverser
                         </button>
                         <button onclick="revokeAccess('${member.teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px; cursor:pointer;" title="Supprimer l'accès">
@@ -1466,6 +1475,15 @@ window.revokeAccess = async function(teamId, membershipId) {
 
 // دالة لتغيير الدور (من Viewer لـ Editor والعكس)
 window.changeRole = async function(oldMembershipId, email, currentRole, graphId) {
+    // حراسة إضافية: إيلا وصلنا هنا بإيميل ماشي صحيح (bug قديم أو نداء يدوي)،
+    // نوقفو دغيا بلا ما نديرو الطلب لـ Appwrite (خاصنا error 400 واضح
+    // بدل من "Invalid `email` param" غامضة فالـ console).
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!isValidEmail) {
+        alert("Impossible de changer le rôle : l'email de cet utilisateur n'est pas disponible (vérifie le réglage \"Memberships privacy\" dans Appwrite Console > Auth > Security).");
+        return;
+    }
+
     if(!confirm(`Voulez-vous changer le rôle de ${email} ? (Un nouvel email lui sera envoyé)`)) return;
     
     const oldTeamId = currentRole === 'viewer' ? "v_" + graphId : "e_" + graphId;
