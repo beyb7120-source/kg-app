@@ -1275,7 +1275,7 @@ shareModalBackdrop.addEventListener("click", (e) => {
 
 
 // ============================================================
-// Logique de Partage (Appwrite Teams & Permissions) - CORRIGÉ
+// Logique de Partage (Appwrite Teams & Permissions) - SANS ERREUR 409
 // ============================================================
 const confirmShareBtn = document.getElementById("confirmShareBtn");
 const shareStatusMsg = document.getElementById("shareStatusMsg");
@@ -1301,11 +1301,12 @@ confirmShareBtn.addEventListener("click", async () => {
         const viewerTeamId = "v_" + currentGraphId;
         const editorTeamId = "e_" + currentGraphId;
 
-        try { await teams.get(viewerTeamId); } 
-        catch (e) { await teams.create(viewerTeamId, "Viewers - Graphe: " + currentGraphId); }
+        // كنحاولو نكرييو الفريق، وإيلا عطانا إيرور 409 (يعني ديجا كاين) كنتجاهلوه
+        try { await teams.create(viewerTeamId, "Viewers - Graphe: " + currentGraphId); } 
+        catch (e) { if(e.code !== 409) throw e; }
 
-        try { await teams.get(editorTeamId); } 
-        catch (e) { await teams.create(editorTeamId, "Editors - Graphe: " + currentGraphId); }
+        try { await teams.create(editorTeamId, "Editors - Graphe: " + currentGraphId); } 
+        catch (e) { if(e.code !== 409) throw e; }
 
         await databases.updateDocument(
             DATABASE_ID, 
@@ -1325,15 +1326,14 @@ confirmShareBtn.addEventListener("click", async () => {
         const redirectUrl = window.location.origin + '/index.html?graphId=' + currentGraphId;
         const targetTeamId = role === 'viewer' ? viewerTeamId : editorTeamId;
 
-        // التعديل كاين هنا: زدنا undefined ديال userId باش الترتيب يتقاد
         await teams.createMembership(
-            targetTeamId,     // 1. teamId
-            [],               // 2. roles
-            email,            // 3. email
-            undefined,        // 4. userId
-            undefined,        // 5. phone
-            redirectUrl,      // 6. url
-            undefined         // 7. name (خليناها undefined باش مايحسبهاش خاوية)
+            targetTeamId,     
+            [],               
+            email,            
+            undefined,        
+            undefined,        
+            redirectUrl,      
+            undefined         
         );
 
         shareStatusMsg.style.color = "#8fbf7f"; 
@@ -1370,15 +1370,19 @@ manageModalBackdrop.addEventListener("click", (e) => {
 });
 
 // دالة لجلب وعرض الأعضاء
+// دالة لجلب وعرض الأعضاء بدون إيرورات 404
 async function loadCollaborators() {
     membersList.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement...</p>';
     const urlParams = new URLSearchParams(window.location.search);
     const currentGraphId = urlParams.get('graphId');
     
     try {
-        // كنجبدو الأعضاء من الفريقين بجوج
-        const vTeam = await teams.listMemberships("v_" + currentGraphId).catch(() => ({ memberships: [] }));
-        const eTeam = await teams.listMemberships("e_" + currentGraphId).catch(() => ({ memberships: [] }));
+        let vTeam = { memberships: [] };
+        let eTeam = { memberships: [] };
+
+        // كنتجاهلو إيرور 404 بصمت باش ما يوقفش لينا الكود
+        try { vTeam = await teams.listMemberships("v_" + currentGraphId); } catch(e) {}
+        try { eTeam = await teams.listMemberships("e_" + currentGraphId); } catch(e) {}
         
         let html = '';
         const allMembers = [
@@ -1387,21 +1391,23 @@ async function loadCollaborators() {
         ];
 
         if (allMembers.length === 0) {
-            html = '<p style="text-align:center; color:var(--text-muted);">Aucun collaborateur pour le moment.</p>';
+            html = '<p style="text-align:center; color:var(--text-muted); font-size:13px;">Aucun collaborateur pour le moment.</p>';
         } else {
             allMembers.forEach(member => {
-                const status = member.confirm ? '<span style="color:#8fbf7f; font-size:11px;">Actif</span>' : '<span style="color:#e06b6b; font-size:11px;">En attente</span>';
+                const status = member.confirm ? '<span style="color:#8fbf7f; font-size:11px;">(Actif)</span>' : '<span style="color:#e06b6b; font-size:11px;">(En attente)</span>';
+                
+                // هادا هو التصميم اللي طلبتي: الإيميل والدور، عاد الأزرار
                 html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
-                    <div>
-                        <div style="font-weight:bold; font-size:14px; margin-bottom:4px;">${member.userEmail}</div>
-                        <div>${status} • Rôle actuel: <strong style="text-transform:capitalize;">${member.role}</strong></div>
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <span style="font-weight:bold; font-size:14px; color:var(--text-primary);">${member.userEmail}</span>
+                        <span style="font-size:12px; color:var(--text-muted);">Rôle: <strong style="text-transform:capitalize; color:var(--text-primary);">${member.role}</strong> ${status}</span>
                     </div>
                     <div style="display:flex; gap:8px;">
-                        <button onclick="changeRole('${member.$id}', '${member.userEmail}', '${member.role}', '${currentGraphId}')" class="secondary-btn" style="padding:6px 12px; font-size:12px;" title="Changer le rôle">
+                        <button onclick="changeRole('${member.$id}', '${member.userEmail}', '${member.role}', '${currentGraphId}')" class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;" title="Changer le rôle">
                             <i class="fa-solid fa-right-left"></i> Inverser
                         </button>
-                        <button onclick="revokeAccess('${member.teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none;" title="Supprimer l'accès">
+                        <button onclick="revokeAccess('${member.teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px; cursor:pointer;" title="Supprimer l'accès">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
