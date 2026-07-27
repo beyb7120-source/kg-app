@@ -127,8 +127,25 @@ async function loadGraphFromDB(id) {
 
         const doc = await databases.getDocument(DATABASE_ID, COLLECTION_ID, id);
 
-        // حيدنا داك ownership check حيت Appwrite Permissions (Teams) هوما اللي كيحميو المبيان دابا.
-        // إيلا Appwrite خلاه يوصل لهاد السطر، راه يعني عندو الحق يشوفو.
+        // ماخصناش نثقو بلي "الطلب نجح" = "عندي الحق". إيلا Document Security
+        // ماشي مفعّل صحيح فـ Appwrite Console (أو الصلاحيات ديال الـ
+        // collection واسعة بزاف)، getDocument يقدر ينجح لحتى لشخص ماشي
+        // Owner ولا Member. هادشي verification إضافية (defense-in-depth)
+        // — الحماية الحقيقية تبقى ديما فـ Appwrite Permissions (شوف Console).
+        isOwner = doc.userId === currentUser.$id;
+        let hasAccess = isOwner;
+        if (!hasAccess) {
+            try {
+                const members = await teams.listMemberships(teamIdFor(id));
+                hasAccess = members.memberships.some(m => m.userId === currentUser.$id && m.confirm);
+            } catch { /* الفريق مازال ماكاينش (الغراف مامشاركش حتى بمرة) */ }
+        }
+        if (!hasAccess) {
+            await showRequestAccessModal(id);
+            emptyState.style.display = "block";
+            emptyState.textContent = "Accès requis.";
+            return;
+        }
 
         currentDbId = id;
         currentSourceCount = doc.sourceCount || 1;
@@ -152,11 +169,10 @@ async function loadGraphFromDB(id) {
         statsBtn.disabled = false;
         arrangeGraphBtn.disabled = false;
 
-        // إظهار وإخفاء الأزرار على حسب شكون اللي فاتح المبيان
-        isOwner = doc.userId === currentUser.$id;
         updateAccessButtonsVisibility();
         currentGraphOwnerId = doc.userId;
         subscribeToOwnMembership(id);
+        subscribeToGraphContent(id);
         if (isOwner) startPendingRequestsWatch(id);
 
         drawGraph();
@@ -574,6 +590,7 @@ runBtn.addEventListener("click", async () => {
     // graphId من قبل) لي أنت خالقه، وتتبدل فـ loadGraphFromDB إيلا كنتي
     // فاتح مبيان كاين من قبل.
     updateAccessButtonsVisibility();
+    if (currentDbId && !unsubscribeGraphContent) subscribeToGraphContent(currentDbId);
 
   } catch (err) {
     setStage(err.message, "error");
@@ -747,8 +764,8 @@ function showNodeDetail(node) {
       <div class="detail-actions">
         <button data-role="ask-ai"><i class="fa-solid fa-robot"></i> Demander à l'IA</button>
         <button data-role="go-to-source"><i class="fa-solid fa-quote-right"></i> Voir dans le texte source</button>
-        <button data-role="edit-node"><i class="fa-solid fa-pen"></i> Modifier</button>
-        <button data-role="add-relation"><i class="fa-solid fa-link"></i> Ajouter une relation</button>
+        <button data-role="edit-node" class="editor-only"><i class="fa-solid fa-pen"></i> Modifier</button>
+        <button data-role="add-relation" class="editor-only"><i class="fa-solid fa-link"></i> Ajouter une relation</button>
       </div>
     </div>`;
 
@@ -759,10 +776,10 @@ function showNodeDetail(node) {
     ?.addEventListener("click", () => showSourceInLeftPanel({ sectionId: node.sourceSectionId, quote: node.sourceQuote }));
 
   nodePopupBody.querySelector('[data-role="edit-node"]')
-    ?.addEventListener("click", () => showNodeEditForm(node));
+    ?.addEventListener("click", () => { if (canEdit()) showNodeEditForm(node); else showToast("Lecture seule : tu es Viewer sur ce graphe.", "error"); });
 
   nodePopupBody.querySelector('[data-role="add-relation"]')
-    ?.addEventListener("click", () => openAddRelationModal(node.id));
+    ?.addEventListener("click", () => { if (canEdit()) openAddRelationModal(node.id); else showToast("Lecture seule : tu es Viewer sur ce graphe.", "error"); });
 
   nodePopupBody.querySelectorAll(".chip").forEach((chip) => {
     chip.addEventListener("click", () => {
@@ -799,6 +816,7 @@ function showNodeEditForm(node) {
   zone.querySelector("#cancelNodeEditBtn").addEventListener("click", () => showNodeDetail(node));
 
   zone.querySelector("#saveNodeEditBtn").addEventListener("click", async () => {
+    if (!canEdit()) { showToast("Lecture seule : tu es Viewer sur ce graphe.", "error"); return; }
     const newLabel = zone.querySelector("#editNodeLabel").value.trim();
     const newDefinition = zone.querySelector("#editNodeDefinition").value.trim();
     if (!newLabel) return;
@@ -869,8 +887,8 @@ function showEdgeDetail(edge) {
 
       <div class="detail-actions">
         <button data-role="go-to-source"><i class="fa-solid fa-quote-right"></i> Voir dans le texte source</button>
-        <button data-role="save-edge-type"><i class="fa-solid fa-check"></i> Enregistrer le type</button>
-        <button data-role="delete-edge" class="danger-action"><i class="fa-solid fa-trash"></i> Supprimer la relation</button>
+        <button data-role="save-edge-type" class="editor-only"><i class="fa-solid fa-check"></i> Enregistrer le type</button>
+        <button data-role="delete-edge" class="danger-action editor-only"><i class="fa-solid fa-trash"></i> Supprimer la relation</button>
       </div>
     </div>`;
 
@@ -881,6 +899,7 @@ function showEdgeDetail(edge) {
     ?.addEventListener("click", () => showSourceInLeftPanel({ quote: edge.sourceQuote }));
 
   nodePopupBody.querySelector('[data-role="save-edge-type"]')?.addEventListener("click", async () => {
+    if (!canEdit()) { showToast("Lecture seule : tu es Viewer sur ce graphe.", "error"); return; }
     const newType = nodePopupBody.querySelector("#editEdgeType").value;
     if (!RELATION_KEYS.includes(newType) || newType === edge.type) return;
     edge.type = newType;
@@ -895,6 +914,7 @@ function showEdgeDetail(edge) {
   });
 
   nodePopupBody.querySelector('[data-role="delete-edge"]')?.addEventListener("click", async () => {
+    if (!canEdit()) { showToast("Lecture seule : tu es Viewer sur ce graphe.", "error"); return; }
     if (!confirm("Supprimer cette relation ?")) return;
     currentGraphData.edges = currentGraphData.edges.filter((e) => e.id !== edge.id);
     closeNodePopup();
@@ -1293,6 +1313,7 @@ function openAddRelationModal(fromNodeId) {
 
 addRelationForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!canEdit()) { showToast("Lecture seule : tu es Viewer sur ce graphe.", "error"); return; }
   const source = relationFromSelect.value;
   const target = relationToSelect.value;
   const type = relationTypeSelect.value;
@@ -1401,6 +1422,10 @@ async function ensureShareTeam(graphId) {
     try { await teams.create(teamId, "Graphe: " + graphId); }
     catch (e) { if (e.code !== 409) throw e; }
 
+    // بالدفو، حتى وحد ماعندو update غير Owner — Viewer عندو غير read.
+    // ملي يتزاد Editor حقيقي (createMembership بـ role='editor')، دالة
+    // narrowUpdatePermissionToEditors() تحت كتزيد ليه update، حيت Appwrite
+    // مايقبلش permission بـ role li mazal ma-t3tat لحتى membership.
     await databases.updateDocument(
         DATABASE_ID,
         COLLECTION_ID,
@@ -1411,14 +1436,28 @@ async function ensureShareTeam(graphId) {
             Permission.update(Role.user(currentUser.$id)),
             Permission.delete(Role.user(currentUser.$id)),
             Permission.read(Role.team(teamId)),
-            // ماشي Role.team(teamId, ['editor']) — Appwrite كيرفض permission
-            // بـ role مازال ماتعطاتش لحتى membership فهاد الفريق (chicken-and-egg
-            // مع فريق جديد). كنعطيو update للفريق كامل، والتقييد الحقيقي
-            // ديال viewer (read-only) كيبقى فـ UI عبر applyOwnRole().
-            Permission.update(Role.team(teamId)),
         ]
     );
     return teamId;
+}
+
+// كتزاد فقط ملي كاين membership واحدة (على الأقل) بدور 'editor' فهاد
+// الفريق — عادي تنعاود نديرها مرات بزاف (idempotent)، ماخطيرش.
+async function narrowUpdatePermissionToEditors(graphId, teamId) {
+    try {
+        await databases.updateDocument(
+            DATABASE_ID, COLLECTION_ID, graphId, undefined,
+            [
+                Permission.read(Role.user(currentUser.$id)),
+                Permission.update(Role.user(currentUser.$id)),
+                Permission.delete(Role.user(currentUser.$id)),
+                Permission.read(Role.team(teamId)),
+                Permission.update(Role.team(teamId, ["editor"])),
+            ]
+        );
+    } catch (e) {
+        console.error("Impossible de restreindre update aux editors (permission reste Owner-only pour l'instant):", e);
+    }
 }
 
 const confirmShareBtn = document.getElementById("confirmShareBtn");
@@ -1444,6 +1483,7 @@ confirmShareBtn.addEventListener("click", async () => {
         const redirectUrl = window.location.origin + '/index.html?graphId=' + currentGraphId;
 
         await teams.createMembership(teamId, [role], email, undefined, undefined, redirectUrl, undefined);
+        if (role === 'editor') await narrowUpdatePermissionToEditors(currentGraphId, teamId);
 
         shareStatusMsg.style.color = "#8fbf7f";
         shareStatusMsg.textContent = `Invitation envoyée avec succès à ${email} en tant que ${role} !`;
@@ -1552,6 +1592,7 @@ window.changeRole = async function (teamId, membershipId, newRole) {
     if (!confirm(`Voulez-vous changer le rôle de cet utilisateur en "${newRole}" ?`)) return;
     try {
         await teams.updateMembership(teamId, membershipId, [newRole]);
+        if (newRole === 'editor') await narrowUpdatePermissionToEditors(teamId.slice(2), teamId);
         showToast("Rôle mis à jour instantanément.", "success");
         await loadCollaborators();
     } catch (err) {
@@ -1565,9 +1606,33 @@ window.changeRole = async function (teamId, membershipId, newRole) {
 // الصلاحيات و الأيقونة يتبدلو حياً بلا refresh.
 // ============================================================
 let unsubscribeMembership = null;
+let unsubscribeGraphContent = null;
+
+// Realtime ديال المحتوى ديال الغراف نفسو (nodes/edges) — قبل هادشي كان
+// كاين غير realtime ديال الدور (role)، ماشي ديال المحتوى. دابا: إيلا
+// شخص آخر (Owner أو Editor) بدل حاجة، كل واحد آخر فاتح نفس الغراف
+// كيتبدل عندو العرض حياً بلا refresh.
+function subscribeToGraphContent(id) {
+    if (unsubscribeGraphContent) { unsubscribeGraphContent(); unsubscribeGraphContent = null; }
+    unsubscribeGraphContent = client.subscribe(
+        `databases.${DATABASE_ID}.collections.${COLLECTION_ID}.documents.${id}`,
+        (event) => {
+            if (!event.events.some(e => e.endsWith('.update'))) return;
+            const doc = event.payload;
+            try {
+                currentGraphData = JSON.parse(doc.graphData);
+                currentSections = doc.sections ? JSON.parse(doc.sections) : null;
+                if (doc.title) graphTitleEl.textContent = doc.title;
+                drawGraph();
+                showToast("Le graphe a été mis à jour par un collaborateur.", "success");
+            } catch (e) { console.error("Realtime graph update:", e); }
+        }
+    );
+}
+
 function subscribeToOwnMembership(graphId) {
     if (unsubscribeMembership) { unsubscribeMembership(); unsubscribeMembership = null; }
-    if (isOwner) { currentUserRole = 'owner'; return; } // Owner ديما كامل الصلاحيات
+    if (isOwner) { applyOwnRole('owner'); return; } // Owner ديما كامل الصلاحيات
 
     const teamId = teamIdFor(graphId);
     // نجيبو الدور الحالي ديالنا أول مرة (بلا نتسناو حدث Realtime).
@@ -1594,15 +1659,23 @@ function subscribeToOwnMembership(graphId) {
 // على حساب الدور الجديد (نفس المنطق لأي نوع تعديل: rename, delete node/edge...).
 function applyOwnRole(role) {
     currentUserRole = role; // 'viewer' | 'editor'
-    const canEdit = currentUserRole === 'editor' || isOwner;
-    document.body.classList.toggle('read-only-mode', !canEdit);
+    const editAllowed = currentUserRole === 'editor' || isOwner;
+    document.body.classList.toggle('read-only-mode', !editAllowed);
     // أي زر/عنصر عندو class "editor-only" كيتفعل/كيتعطل تلقائياً هنا —
     // هكذا ماخصناش نبدلو كل دالة تعديل واحدة واحدة فالكود.
     document.querySelectorAll('.editor-only').forEach(el => {
-        el.disabled = !canEdit;
-        el.style.opacity = canEdit ? '1' : '0.4';
-        el.style.pointerEvents = canEdit ? 'auto' : 'none';
+        el.disabled = !editAllowed;
+        el.style.opacity = editAllowed ? '1' : '0.4';
+        el.style.pointerEvents = editAllowed ? 'auto' : 'none';
     });
+}
+
+// الحارس المركزي: كل دالة كتبدل الغراف (rename/delete node/edge, add
+// relation...) خاصها تبدا بيه. Owner ديما عندو الحق، Editor عندو الحق،
+// Viewer لا. هادشي حماية UI — الحماية الحقيقية (Appwrite Permissions)
+// كاينة فـ ensureShareTeam/confirmShareBtn (update مقيد بـ role editor).
+function canEdit() {
+    return isOwner || currentUserRole === 'editor';
 }
 
 // ============================================================
@@ -1778,6 +1851,7 @@ window.acceptAccessRequest = async function (requestId) {
         const teamId = await ensureShareTeam(req.graphId);
         const redirectUrl = window.location.origin + '/index.html?graphId=' + req.graphId;
         await teams.createMembership(teamId, [role], req.requesterEmail, undefined, undefined, redirectUrl, undefined);
+        if (role === 'editor') await narrowUpdatePermissionToEditors(req.graphId, teamId);
         await databases.updateDocument(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, requestId, { status: 'accepted' });
         showToast(`Accès accordé à ${req.requesterEmail} en tant que ${role}.`, "success");
         await loadCollaborators();
