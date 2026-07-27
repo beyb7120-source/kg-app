@@ -220,16 +220,6 @@ const pathModalClose = document.getElementById("pathModalClose");
 // ---- app state ----
 let selectedFile = null;
 let currentGraphData = null;  // {nodes, edges} — stage 2 output, kept for export/chat/path
-
-// true إيلا آخر محاولة save فشلت — كنستعملوها باش نبينو تحذير قبل ما
-// المستخدم يسر refresh/يسد التبويب بلا مايعرف بلي التعديلات ماتسجلاتش.
-let hasUnsavedFailure = false;
-window.addEventListener("beforeunload", (e) => {
-  if (hasUnsavedFailure) {
-    e.preventDefault();
-    e.returnValue = "";
-  }
-});
 let currentSections = null;   // stage 1 output — kept for "aller à la source" + chat context
 let currentCy = null;         // live Cytoscape instance — kept for export + programmatic selection
 let activeChatNode = null;    // which node the inline chat is currently about
@@ -496,14 +486,10 @@ runBtn.addEventListener("click", async () => {
           );
           await persistGraphToDatabase();
         } catch (saveError) {
-          // خطأ ف Sauvegarde ماخصوش يوقف الـ pipeline (الموديل مزال خدام)،
-          // لكن خاصنا نبينوه بشكل واضح (ماشي toast كيتبع فـ 4.5s) حيت
-          // إيلا المستخدم دار refresh قبل مايشوفو، غادي يخسر الغراف نيشان
-          // (الوثيقة فالـ DB تبقى بالحالة القديمة/الفارغة).
+          // خطأ ف Sauvegarde ماخصوش يوقف الـ pipeline (الموديل مزال خدام) —
+          // كنسجلوه فـ console + toast غير مزعج (non-bloquant).
           console.error(`Erreur de sauvegarde automatique (${stageName}):`, saveError);
-          console.error("Taille du payload graphData (chars):", JSON.stringify(currentGraphData ?? {}).length);
-          hasUnsavedFailure = true;
-          showToast("⚠️ Échec de la SAUVEGARDE — ne rafraîchis PAS la page, sinon tu vas perdre ce graphe. Erreur: " + saveError.message, "error");
+          showToast("Échec de la sauvegarde automatique — le texte/graphe reste affiché, réessaie plus tard.", "error");
         }
       },
     };
@@ -619,26 +605,16 @@ async function persistGraphToDatabase() {
     sections: JSON.stringify(currentSections ?? null),
   };
 
-  try {
-    if (!currentDbId) {
-      const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), payload);
-      currentDbId = doc.$id;
-      // نحدثو الـ URL بلا reload، باش أي update لاحقة (rename، stage "graph"،
-      // ريفريش ديال الصفحة...) تلقى نفس الوثيقة بدل ما تخلق وحدة جديدة.
-      const url = new URL(window.location.href);
-      url.searchParams.set('graphId', currentDbId);
-      window.history.replaceState({}, '', url);
-    } else {
-      await databases.updateDocument(DATABASE_ID, COLLECTION_ID, currentDbId, payload);
-    }
-    // Save نجحت — نمسحو أي علامة "خطر، عندك تعديلات ماتسجلاتش" باقية.
-    hasUnsavedFailure = false;
-  } catch (err) {
-    // كنعلمو بلي كاين تعديل ماتسجلش (خاص refresh/إغلاق التبويب يبقاو
-    // محذرين، شوف beforeunload فوق) قبل ما نرجعو الخطأ لمن استدعانا —
-    // هوما اللي كيقرروا شنو يبينو للمستخدم بالضبط.
-    hasUnsavedFailure = true;
-    throw err;
+  if (!currentDbId) {
+    const doc = await databases.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), payload);
+    currentDbId = doc.$id;
+    // نحدثو الـ URL بلا reload، باش أي update لاحقة (rename، stage "graph"،
+    // ريفريش ديال الصفحة...) تلقى نفس الوثيقة بدل ما تخلق وحدة جديدة.
+    const url = new URL(window.location.href);
+    url.searchParams.set('graphId', currentDbId);
+    window.history.replaceState({}, '', url);
+  } else {
+    await databases.updateDocument(DATABASE_ID, COLLECTION_ID, currentDbId, payload);
   }
 }
 
