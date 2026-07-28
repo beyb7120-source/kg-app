@@ -82,6 +82,22 @@ const membershipIdParam = urlParams.get('membershipId');
 const userIdParam = urlParams.get('userId');
 const secretParam = urlParams.get('secret');
 
+const copiedTextBtn = document.getElementById("copiedTextBtn");
+const copiedTextModalBackdrop = document.getElementById("copiedTextModalBackdrop");
+const closeCopiedTextModal = document.getElementById("closeCopiedTextModal");
+const backFromCopiedText = document.getElementById("backFromCopiedText");
+const insertCopiedTextBtn = document.getElementById("insertCopiedTextBtn");
+const copiedTextInput = document.getElementById("copiedTextInput");
+
+const websitesBtn = document.getElementById("websitesBtn");
+const websitesModalBackdrop = document.getElementById("websitesModalBackdrop");
+const closeWebsitesModal = document.getElementById("closeWebsitesModal");
+const backFromWebsites = document.getElementById("backFromWebsites");
+const insertWebsitesBtn = document.getElementById("insertWebsitesBtn");
+const websitesInput = document.getElementById("websitesInput");
+
+const driveBtn = document.getElementById("driveBtn");
+
 
 // ============================================================
 // Multi-Source Management
@@ -417,6 +433,128 @@ let currentSourceCount = 1;   // nombre de sources fusionnées dans ce graphe (m
 
 initThemeToggle(themeToggleBtn);
 
+
+// ============================================================
+// Logic for Sub-Modals (Websites & Copied Text)
+// ============================================================
+
+// فتح النوافذ الفرعية
+copiedTextBtn.addEventListener("click", () => {
+    addSourceModalBackdrop.classList.remove("open");
+    copiedTextModalBackdrop.classList.add("open");
+});
+
+websitesBtn.addEventListener("click", () => {
+    addSourceModalBackdrop.classList.remove("open");
+    websitesModalBackdrop.classList.add("open");
+});
+
+// الرجوع والإغلاق
+const closeSubModals = () => {
+    copiedTextModalBackdrop.classList.remove("open");
+    websitesModalBackdrop.classList.remove("open");
+};
+closeCopiedTextModal.addEventListener("click", closeSubModals);
+closeWebsitesModal.addEventListener("click", closeSubModals);
+
+backFromCopiedText.addEventListener("click", () => {
+    closeSubModals();
+    addSourceModalBackdrop.classList.add("open");
+});
+backFromWebsites.addEventListener("click", () => {
+    closeSubModals();
+    addSourceModalBackdrop.classList.add("open");
+});
+
+// إدراج النص المنسوخ (Insert Copied Text)
+insertCopiedTextBtn.addEventListener("click", () => {
+    const text = copiedTextInput.value.trim();
+    if (text) {
+        sourcesArray.push({
+            id: Date.now().toString(36),
+            name: "Texte copié " + new Date().toLocaleTimeString(),
+            type: 'text',
+            data: text, // النص لي كوبا المستخدِم
+            selected: true
+        });
+        copiedTextInput.value = "";
+        closeSubModals();
+        renderSourcesList();
+    }
+});
+
+// إدراج الروابط (Insert Websites)
+insertWebsitesBtn.addEventListener("click", () => {
+    const urls = websitesInput.value.trim().split(/\s+/).filter(u => u); // تفرقة الروابط بسبيس ولا سطر جديد
+    if (urls.length > 0) {
+        urls.forEach(url => {
+            sourcesArray.push({
+                id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
+                name: url,
+                type: 'url',
+                data: url,
+                selected: true
+            });
+        });
+        websitesInput.value = "";
+        closeSubModals();
+        renderSourcesList();
+    }
+});
+
+// ============================================================
+// Google Drive Picker Logic
+// ============================================================
+driveBtn.addEventListener("click", () => {
+    // بما أنك ديجا داير تسجيل الدخول بجوجل، خصنا نجبدو الـ Token ديالو
+    // وغادي نعيطو لـ Google Picker API
+    if (typeof gapi === 'undefined') {
+        showToast("L'API Google Picker n'est pas chargée. Ajoutez le script dans index.html", "error");
+        return;
+    }
+    addSourceModalBackdrop.classList.remove("open");
+    gapi.load('picker', { 'callback': createGooglePicker });
+});
+
+function createGooglePicker() {
+    // جيب الأكسيس طوكن (Access Token) ديال المستخدِم الحالي من عندك (Appwrite Session / Google)
+    // كمثال، بدّل هاد المتغير بالـ Token الحقيقي لي عندك فـ لابليكاسيون:
+    const oauthToken = window.GOOGLE_OAUTH_TOKEN || prompt("Pour le test: Collez votre Google OAuth Token ici"); 
+    
+    if (!oauthToken) {
+        showToast("Erreur d'authentification Google.", "error");
+        return;
+    }
+
+    const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false);
+
+    const picker = new google.picker.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(oauthToken)
+        // .setDeveloperKey('VOTRE_API_KEY') // اختياري يلا كنتي كتستعمل غير OAuth
+        .setCallback(pickerCallback)
+        .build();
+    picker.setVisible(true);
+}
+
+function pickerCallback(data) {
+    if (data.action === google.picker.Action.PICKED) {
+        const docs = data.docs;
+        docs.forEach(doc => {
+            sourcesArray.push({
+                id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
+                name: doc.name,
+                type: 'drive',
+                data: doc, // فيها doc.id و doc.url لي غتحتاج من بعد
+                selected: true
+            });
+        });
+        renderSourcesList();
+    }
+}
+
 // ============================================================
 // Clé API Mistral — mémoire par défaut (jamais persistée), avec un
 // opt-in explicite "se souvenir" qui la garde en sessionStorage
@@ -583,12 +721,21 @@ runBtn.addEventListener("click", async () => {
         let allPages = [];
         
         // غنجمعو الـ Text ديال كاع المصادر المختارة دقة وحدة
+        // غنجمعو الـ Text ديال كاع المصادر المختارة دقة وحدة
         for (const source of selectedSources) {
             if (source.type === 'pdf') {
                 const pages = await extractPdfPages(source.data);
                 allPages = allPages.concat(pages);
+            } else if (source.type === 'text') {
+                // تحويل النص المنسوخ لنفس الصيغة لي كيستناها الموديل
+                const pages = wrapPastedText(source.data);
+                allPages = allPages.concat(pages);
+            } else if (source.type === 'url' || source.type === 'drive') {
+                // هادو غيحتاجو Backend باش يتجراو ليهم الـ Scraping / Fetching
+                // مؤقتاً، غنصيفطو غير الرابط أو اسم الملف للموديل
+                const pages = wrapPastedText(`[Contenu de la source externe non implémenté localement: ${source.name}]`);
+                allPages = allPages.concat(pages);
             }
-            // تقدر تزيد هنا logic ديال copied text او websites
         }
 
         const context = {
