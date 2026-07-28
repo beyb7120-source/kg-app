@@ -105,7 +105,7 @@ const backFromWebsites = document.getElementById("backFromWebsites");
 const insertWebsitesBtn = document.getElementById("insertWebsitesBtn");
 const websitesInput = document.getElementById("websitesInput");
 
-const driveBtn = document.getElementById("driveLinkBtn");
+
 
 const sourceResultBlock = document.getElementById("sourceResultBlock");
 const closeSourceResultBtn = document.getElementById("closeSourceResultBtn");
