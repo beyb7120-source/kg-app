@@ -265,6 +265,7 @@ insertWebsitesBtn.addEventListener("click", () => {
 });
 
 // Google Drive Logic
+// Google Drive Logic
 driveBtn.addEventListener("click", async () => {
     addSourceModalBackdrop.classList.remove("open");
     
@@ -284,7 +285,8 @@ driveBtn.addEventListener("click", async () => {
 
             const picker = new google.picker.PickerBuilder()
                 .addView(view)
-                .setOAuthToken(oauthToken) 
+                .setOAuthToken(oauthToken)
+                .setDeveloperKey('AIzaSyA2_N99wifB_dZrqsSynaKj-8yhJxqJ5Vw') // <--- هاد السطر هو لي كيحل مشكل 403
                 .setCallback((data) => {
                     if (data.action === google.picker.Action.PICKED) {
                         data.docs.forEach(doc => {
