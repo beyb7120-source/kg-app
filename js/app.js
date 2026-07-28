@@ -593,16 +593,54 @@ insertWebsitesBtn.addEventListener("click", () => {
 // ============================================================
 // Google Drive Picker Logic
 // ============================================================
-driveBtn.addEventListener("click", () => {
-    // بما أنك ديجا داير تسجيل الدخول بجوجل، خصنا نجبدو الـ Token ديالو
-    // وغادي نعيطو لـ Google Picker API
-    if (typeof gapi === 'undefined') {
-        showToast("L'API Google Picker n'est pas chargée. Ajoutez le script dans index.html", "error");
-        return;
-    }
+driveBtn.addEventListener("click", async () => {
     addSourceModalBackdrop.classList.remove("open");
-    gapi.load('picker', { 'callback': createGooglePicker });
+    
+    try {
+        // 1. كنجبدو الـ Session الحالية من Appwrite باش ناخدو منها الـ Token ديال Google
+        const session = await account.getSession('current');
+        const oauthToken = session.providerAccessToken;
+
+        // إيلا المستخدِم ماعندوش Token ديال جوجل (مثلا داخل غير بالإيميل والكود)
+        if (!oauthToken) {
+            showToast("Erreur: Vous devez être connecté avec Google pour utiliser Drive.", "error");
+            return;
+        }
+
+        // 2. إيلا لقينا الـ Token، كنعيطو لـ Google Picker أوتوماتيكيا بلا حتى شي Prompt
+        gapi.load('picker', { 'callback': () => {
+            const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(false);
+
+            const picker = new google.picker.PickerBuilder()
+                .addView(view)
+                .setOAuthToken(oauthToken) // هنا كندوزو الساروت مخفي
+                .setCallback((data) => {
+                    if (data.action === google.picker.Action.PICKED) {
+                        data.docs.forEach(doc => {
+                            sourcesArray.push({
+                                id: doc.id, // ID ديال الملف فجوجل درايف
+                                name: doc.name,
+                                type: 'drive',
+                                data: doc,
+                                selected: true
+                            });
+                        });
+                        renderSourcesList();
+                    }
+                })
+                .build();
+            picker.setVisible(true);
+        }});
+        
+    } catch (error) {
+        console.error("Erreur de session Appwrite:", error);
+        showToast("Impossible de vérifier l'authentification Google.", "error");
+    }
 });
+
+
 
 function createGooglePicker() {
     // جيب الأكسيس طوكن (Access Token) ديال المستخدِم الحالي من عندك (Appwrite Session / Google)
