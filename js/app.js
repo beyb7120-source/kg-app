@@ -82,6 +82,145 @@ const membershipIdParam = urlParams.get('membershipId');
 const userIdParam = urlParams.get('userId');
 const secretParam = urlParams.get('secret');
 
+
+// ============================================================
+// Multi-Source Management
+// ============================================================
+let sourcesArray = []; // غتخزن لينا المصادر { id, name, type, data, selected }
+
+const sourcesManager = document.getElementById("sourcesManager");
+const sourcesListEl = document.getElementById("sourcesList");
+const selectAllSourcesCheckbox = document.getElementById("selectAllSources");
+const addSourceBtn = document.getElementById("addSourceBtn");
+const addSourceModalBackdrop = document.getElementById("addSourceModalBackdrop");
+const closeAddSourceModal = document.getElementById("closeAddSourceModal");
+const uploadFilesBtn = document.getElementById("uploadFilesBtn");
+const multiPdfInput = document.getElementById("multiPdfInput");
+
+const sourceResultBlock = document.getElementById("sourceResultBlock");
+const closeSourceResultBtn = document.getElementById("closeSourceResultBtn");
+
+// 1. فتح وإغلاق Popup ديال إضافة المصادر
+addSourceBtn.addEventListener("click", () => addSourceModalBackdrop.classList.add("open"));
+closeAddSourceModal.addEventListener("click", () => addSourceModalBackdrop.classList.remove("open"));
+
+// 2. إضافة ملفات PDF
+uploadFilesBtn.addEventListener("click", () => multiPdfInput.click());
+multiPdfInput.addEventListener("change", (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+        sourcesArray.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+            name: file.name,
+            type: 'pdf',
+            data: file, // الملف الأصلي باش نقراوه من بعد
+            selected: true
+        });
+    });
+    addSourceModalBackdrop.classList.remove("open");
+    renderSourcesList();
+});
+
+// 3. تحديث واجهة لائحة المصادر
+function renderSourcesList() {
+    sourcesListEl.innerHTML = "";
+    sourcesArray.forEach(source => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+            <div class="source-info">
+                <i class="fa-solid ${source.type === 'pdf' ? 'fa-file-pdf' : 'fa-align-left'}"></i>
+                <span class="source-name">${escapeHtml(source.name)}</span>
+            </div>
+            <div class="source-actions">
+                <div class="dropdown">
+                    <button class="dots-btn" onclick="toggleDropdown('${source.id}')"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                    <div id="dropdown-${source.id}" class="dropdown-content">
+                        <button onclick="renameSource('${source.id}')"><i class="fa-solid fa-pen"></i> Rename source</button>
+                        <button onclick="removeSource('${source.id}')"><i class="fa-solid fa-trash"></i> Remove source</button>
+                    </div>
+                </div>
+                <input type="checkbox" class="source-checkbox" data-id="${source.id}" ${source.selected ? "checked" : ""}>
+            </div>
+        `;
+        sourcesListEl.appendChild(li);
+    });
+
+    // Event listeners للـ checkboxes ديال كل مصدر
+    document.querySelectorAll(".source-checkbox").forEach(checkbox => {
+        checkbox.addEventListener("change", (e) => {
+            const id = e.target.getAttribute("data-id");
+            const source = sourcesArray.find(s => s.id === id);
+            if (source) source.selected = e.target.checked;
+            updateSelectAllState();
+        });
+    });
+}
+
+// 4. التحكم في Select All
+selectAllSourcesCheckbox.addEventListener("change", (e) => {
+    const isChecked = e.target.checked;
+    sourcesArray.forEach(s => s.selected = isChecked);
+    renderSourcesList();
+});
+
+function updateSelectAllState() {
+    const allSelected = sourcesArray.length > 0 && sourcesArray.every(s => s.selected);
+    selectAllSourcesCheckbox.checked = allSelected;
+}
+
+// 5. الـ 3 نقط (Menu)
+window.toggleDropdown = function(id) {
+    document.querySelectorAll('.dropdown-content').forEach(d => d.classList.remove('show'));
+    document.getElementById(`dropdown-${id}`).classList.toggle('show');
+};
+window.removeSource = function(id) {
+    sourcesArray = sourcesArray.filter(s => s.id !== id);
+    renderSourcesList();
+};
+window.renameSource = function(id) {
+    const source = sourcesArray.find(s => s.id === id);
+    if (!source) return;
+    const newName = prompt("Nouveau nom de la source :", source.name);
+    if (newName && newName.trim() !== "") {
+        source.name = newName.trim();
+        renderSourcesList();
+    }
+};
+
+// 6. View Sources Logic (تبديل بين اللائحة والنص)
+// هاد الدالة غادي تعوض ديك لي عندك
+window.showSourceInLeftPanel = function({ sectionId, quote }) {
+    sourcesManager.style.display = "none"; // خبي اللائحة
+    sourceResultBlock.style.display = "block"; // بين النص
+
+    if (!currentSections) {
+        sourceResult.innerHTML = `<p class="empty-hint">Le texte source n'est pas disponible...</p>`;
+    } else {
+        const section = sectionId
+            ? findSection(currentSections, sectionId)
+            : findSectionByQuote(currentSections, quote);
+
+        if (!section) {
+            sourceResult.innerHTML = `<p class="empty-hint">Impossible de retrouver ce passage...</p>`;
+        } else {
+            const { chunks } = highlightQuote(section.text, quote);
+            const body = chunks
+                .map((c) => (c.highlight ? `<mark>${escapeHtml(c.text)}</mark>` : escapeHtml(c.text)))
+                .join("");
+            sourceResult.innerHTML = `
+                <p class="source-heading">${escapeHtml(section.id)} — ${escapeHtml(section.heading)}</p>
+                ${body}`;
+        }
+    }
+    sourceResultBlock.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+// زر إغلاق View Sources
+closeSourceResultBtn.addEventListener("click", () => {
+    sourceResultBlock.style.display = "none";
+    sourcesManager.style.display = "block";
+});
+
 // بلوك واحد نقي للتحقق من الدخول وقبول الدعوة
 account.get()
     .then(async (response) => {
@@ -205,9 +344,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // ---- DOM refs ----
 const graphTitleEl = document.getElementById("graphTitle");
 const apiKeyInput = document.getElementById("apiKey");
-const dropzone = document.getElementById("dropzone");
-const pdfInput = document.getElementById("pdfInput");
-const pasteText = document.getElementById("pasteText");
 const runBtn = document.getElementById("runBtn");
 const graphContainer = document.getElementById("graphContainer");
 const emptyState = document.getElementById("emptyState");
@@ -223,13 +359,13 @@ const arrangeGraphBtn = document.getElementById("arrangeGraphBtn");
 const confidenceSlider = document.getElementById("confidenceSlider");
 const confidenceValue = document.getElementById("confidenceValue");
 
-const mergeToggleWrap = document.getElementById("mergeToggleWrap");
-const mergeToggleCheckbox = document.getElementById("mergeToggleCheckbox");
+ 
+ 
 
 const jsonImportInput = document.getElementById("jsonImportInput");
 const importJsonBtn = document.getElementById("importJsonBtn");
 
-const rememberKeyCheckbox = document.getElementById("rememberKeyCheckbox");
+
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 
 const statsModalBackdrop = document.getElementById("statsModalBackdrop");
@@ -262,7 +398,6 @@ const pathCycleNote = document.getElementById("pathCycleNote");
 const pathModalClose = document.getElementById("pathModalClose");
 
 // ---- app state ----
-let selectedFile = null;
 let currentGraphData = null;  // {nodes, edges} — stage 2 output, kept for export/chat/path
 
 // true إيلا آخر محاولة save فشلت — كنستعملوها باش نبينو تحذير قبل ما
@@ -287,22 +422,7 @@ initThemeToggle(themeToggleBtn);
 // opt-in explicite "se souvenir" qui la garde en sessionStorage
 // (effacée à la fermeture de l'onglet, jamais localStorage/disque).
 // ============================================================
-const SESSION_KEY_STORAGE = "constella-mistral-key";
 
-const savedSessionKey = sessionStorage.getItem(SESSION_KEY_STORAGE);
-if (savedSessionKey) {
-  apiKeyInput.value = savedSessionKey;
-  runtimeAuth.apiKey = savedSessionKey;
-  rememberKeyCheckbox.checked = true;
-}
-
-rememberKeyCheckbox.addEventListener("change", () => {
-  if (rememberKeyCheckbox.checked) {
-    sessionStorage.setItem(SESSION_KEY_STORAGE, apiKeyInput.value.trim());
-  } else {
-    sessionStorage.removeItem(SESSION_KEY_STORAGE);
-  }
-});
 
 // ============================================================
 // Titre du graphe — clic pour renommer (contenteditable)
@@ -359,36 +479,7 @@ arrangeGraphBtn.addEventListener("click", () => {
 // API key — memory only par défaut, jamais persisté sur disque (voir
 // README) ; sessionStorage seulement si "se souvenir" est coché.
 // ============================================================
-apiKeyInput.addEventListener("input", () => {
-  runtimeAuth.apiKey = apiKeyInput.value.trim();
-  if (rememberKeyCheckbox.checked) {
-    sessionStorage.setItem(SESSION_KEY_STORAGE, runtimeAuth.apiKey);
-  }
-});
 
-// ============================================================
-// File selection
-// ============================================================
-dropzone.addEventListener("click", () => pdfInput.click());
-dropzone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropzone.classList.add("drag-over");
-});
-dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
-dropzone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropzone.classList.remove("drag-over");
-  if (e.dataTransfer.files[0]) setSelectedFile(e.dataTransfer.files[0]);
-});
-pdfInput.addEventListener("change", () => {
-  if (pdfInput.files[0]) setSelectedFile(pdfInput.files[0]);
-});
-
-function setSelectedFile(file) {
-  selectedFile = file;
-  dropzone.querySelector("p strong").textContent = file.name;
-  pasteText.value = "";
-}
 
 // ============================================================
 // Legend
@@ -470,134 +561,73 @@ function setStage(message, status) {
 // Run pipeline
 // ============================================================
 runBtn.addEventListener("click", async () => {
-  if (!runtimeAuth.apiKey) {
-    alert("Colle ta clé API Mistral en haut à droite d'abord.");
-    return;
-  }
-  if (!selectedFile && !pasteText.value.trim()) {
-    alert("Dépose un PDF ou colle du texte d'abord.");
-    return;
-  }
-
-  // Mode "ajouter une source" : seulement possible/pertinent s'il y a déjà
-  // un graphe. Capturé AVANT que le pipeline ne commence à écrire dans
-  // currentGraphData/currentSections.
-  const mergeMode = mergeToggleCheckbox.checked && !!currentGraphData?.nodes?.length;
-  const previousSections = currentSections;
-  const previousGraphData = currentGraphData;
-
-  runBtn.disabled = true;
-  learningPathBtn.disabled = true;
-  exportPdfBtn.disabled = true;
-  exportJsonBtn.disabled = true;
-  statsBtn.disabled = true;
-  arrangeGraphBtn.disabled = true;
-  closeNodePopup();
-  setStage(mergeMode ? "Extraction de la nouvelle source..." : "Extraction en cours...", "active");
-
-  try {
-    const pages = selectedFile
-      ? await extractPdfPages(selectedFile)
-      : wrapPastedText(pasteText.value);
-
-    // Préfixe unique pour cette exécution — sert à éviter toute collision
-    // d'id (sections/nodes/edges) quand on fusionne dans un graphe existant.
-    const runToken = Date.now().toString(36);
-
-    const context = {
-      apiKey: runtimeAuth.apiKey,
-      onProgress: (msg) => setStage(msg, "active"),
-      // كنحفظو تلقائيًا فـ Appwrite بمجرد ماكل مرحلة كتنتج نتيجتها —
-      // ماشي كنتسناو نهاية الـ pipeline كاملة. هكاك، إيلا الموديل نتج
-      // sections (stage "extraction") ومن بعد وقع خطأ فـ stage "graph"،
-      // السورس يبقى محفوظ فالـ DB ومايضيعش.
-      onStageComplete: async (stageName, output) => {
-        if (stageName === "extraction") {
-          if (mergeMode && previousSections) {
-            // نرينوميرو sections الجداد باش مايتقاطعوش مع ids الكاينين
-            // ديجا (s1, s2...) — كنبدلو ids ديال "output" IN PLACE، هكاك
-            // stage "graph" اللي غادي تجي من بعد فـ pipeline.js غادي تشوف
-            // نفس ids الجداد (pipeline.js كيصيفط نفس الـ reference).
-            const baseIndex = previousSections.length;
-            output.forEach((s, i) => { s.id = `${runToken}_s${baseIndex + i + 1}`; });
-            currentSections = [...previousSections, ...output];
-          } else {
-            currentSections = output;
-          }
-        } else if (stageName === "graph") {
-          if (mergeMode && previousGraphData) {
-            currentGraphData = mergeGraphData(previousGraphData, output, runToken);
-          } else {
-            currentGraphData = output;
-          }
-        }
-        try {
-          setStage(
-            stageName === "extraction"
-              ? "Sauvegarde du texte source..."
-              : "Sauvegarde du graphe...",
-            "active"
-          );
-          await persistGraphToDatabase();
-        } catch (saveError) {
-          // خطأ ف Sauvegarde ماخصوش يوقف الـ pipeline (الموديل مزال خدام)،
-          // لكن خاصنا نبينوه بشكل واضح (ماشي toast كيتبع فـ 4.5s) حيت
-          // إيلا المستخدم دار refresh قبل مايشوفو، غادي يخسر الغراف نيشان
-          // (الوثيقة فالـ DB تبقى بالحالة القديمة/الفارغة).
-          console.error(`Erreur de sauvegarde automatique (${stageName}):`, saveError);
-          console.error("Taille du payload graphData (chars):", JSON.stringify(currentGraphData ?? {}).length);
-          hasUnsavedFailure = true;
-          showToast("⚠️ Échec de la SAUVEGARDE — ne rafraîchis PAS la page, sinon tu vas perdre ce graphe. Erreur: " + saveError.message, "error");
-        }
-      },
-    };
-
-    if (mergeMode) currentSourceCount += 1;
-
-    // pipeline.execute() renvoie la sortie de CHAQUE étape, indexée par
-    // nom — on a besoin des sections de l'étape "extraction" plus tard
-    // pour "aller à la source" et le chat, en plus du graphe final.
-    // (currentSections / currentGraphData sont déjà à jour ici grâce à
-    // onStageComplete, mais on les réaffecte pour rester explicite — pas
-    // utile en mode merge, où onStageComplete a déjà fait la fusion.)
-    const results = await runPipeline(pages, context);
-    if (!mergeMode) {
-      currentSections = results.extraction;
-      currentGraphData = results.graph;
+    if (!runtimeAuth.apiKey) {
+        alert("Colle ta clé API Mistral d'abord.");
+        return;
     }
 
-    learningPathBtn.disabled = false;
-    exportPdfBtn.disabled = false;
-    exportJsonBtn.disabled = false;
-    statsBtn.disabled = false;
-    arrangeGraphBtn.disabled = false;
+    // هنا كنعزلو غير المصادر اللي المستخدم دار ليهم Check
+    const selectedSources = sourcesArray.filter(s => s.selected);
+    
+    if (selectedSources.length === 0) {
+        alert("Sélectionnez au moins une source pour générer le graphe.");
+        return;
+    }
 
-    // نمسحو الفورم باش المستخدم مايعاودش يبعث نفس السورس بالغلط
-    selectedFile = null;
-    pasteText.value = "";
-    dropzone.querySelector("p strong").textContent = "Dépose un PDF";
-    mergeToggleCheckbox.checked = false;
+    runBtn.disabled = true;
+    // ... عطل باقي الأزرار بحال لي كان عندك
+    closeNodePopup();
+    setStage("Extraction des sources sélectionnées...", "active");
 
-    emptyState.style.display = "none";
-    drawGraph();
-    showToast(mergeMode ? "Source ajoutée au graphe." : "Graphe généré.", "success");
+    try {
+        let allPages = [];
+        
+        // غنجمعو الـ Text ديال كاع المصادر المختارة دقة وحدة
+        for (const source of selectedSources) {
+            if (source.type === 'pdf') {
+                const pages = await extractPdfPages(source.data);
+                allPages = allPages.concat(pages);
+            }
+            // تقدر تزيد هنا logic ديال copied text او websites
+        }
 
-    // ماشي مجرد "زيد بلوك ديال 3 سطورة هنا" — خاصنا نعرفو واش نتا Owner
-    // ديال هاد المبيان قبل مانبينو الأزرار. إيلا كنت غير Editor عندك
-    // إمكانية تدير merge/ajouter source فمبيان حد آخر، إيلا مساويناش هاد
-    // isOwner، الأزرار غادي يبانو غلط (Partager/Accès لـ Editor بدل
-    // Quitter). isOwner كتبقى true بالدفو غير فحالة مبيان جديد (ماكانش
-    // graphId من قبل) لي أنت خالقه، وتتبدل فـ loadGraphFromDB إيلا كنتي
-    // فاتح مبيان كاين من قبل.
-    updateAccessButtonsVisibility();
-    if (currentDbId && !unsubscribeGraphContent) subscribeToGraphContent(currentDbId);
+        const context = {
+            apiKey: runtimeAuth.apiKey,
+            onProgress: (msg) => setStage(msg, "active"),
+            onStageComplete: async (stageName, output) => {
+                // الكود ديال onStageComplete غيبقى كما هو
+                if (stageName === "extraction") {
+                    currentSections = output;
+                } else if (stageName === "graph") {
+                    currentGraphData = output;
+                }
+                try {
+                    await persistGraphToDatabase();
+                } catch (saveError) {
+                    hasUnsavedFailure = true;
+                    console.error("Erreur de sauvegarde:", saveError);
+                }
+            }
+        };
 
-  } catch (err) {
-    setStage(err.message, "error");
-    showToast(err.message, "error");
-  } finally {
-    runBtn.disabled = false;
-  }
+        // دابا كنعطيو للـ AI اللائحة كاملة دقة وحدة كأنها ملف واحد كبير
+        const results = await runPipeline(allPages, context);
+        currentSections = results.extraction;
+        currentGraphData = results.graph;
+
+        emptyState.style.display = "none";
+        drawGraph();
+        showToast("Graphe généré avec succès à partir des sources sélectionnées.", "success");
+
+        updateAccessButtonsVisibility();
+        if (currentDbId && !unsubscribeGraphContent) subscribeToGraphContent(currentDbId);
+
+    } catch (err) {
+        setStage(err.message, "error");
+        showToast(err.message, "error");
+    } finally {
+        runBtn.disabled = false;
+    }
 });
 
 /**
@@ -609,37 +639,7 @@ runBtn.addEventListener("click", async () => {
  * nœud existant. Limite connue : dédoublonnage par égalité de libellé
  * uniquement (pas de correspondance sémantique/fuzzy).
  */
-function mergeGraphData(existing, fresh, runToken) {
-  const idMap = new Map(); // id (dans `fresh`) -> id final (existant réutilisé, ou nouveau préfixé)
-  const mergedNodes = [...existing.nodes];
 
-  fresh.nodes.forEach((n) => {
-    const match = existing.nodes.find(
-      (en) => en.label.trim().toLowerCase() === n.label.trim().toLowerCase()
-    );
-    if (match) {
-      idMap.set(n.id, match.id);
-    } else {
-      const newId = `${runToken}_${n.id}`;
-      idMap.set(n.id, newId);
-      mergedNodes.push({ ...n, id: newId });
-    }
-  });
-
-  const mergedEdges = [...existing.edges];
-  const existingEdgeKeys = new Set(existing.edges.map((e) => `${e.source}|${e.target}|${e.type}`));
-
-  fresh.edges.forEach((e) => {
-    const source = idMap.get(e.source) ?? e.source;
-    const target = idMap.get(e.target) ?? e.target;
-    const key = `${source}|${target}|${e.type}`;
-    if (existingEdgeKeys.has(key)) return; // déjà présente (probablement entre 2 nœuds dédupliqués)
-    existingEdgeKeys.add(key);
-    mergedEdges.push({ ...e, id: `${runToken}_${e.id}`, source, target });
-  });
-
-  return { nodes: mergedNodes, edges: mergedEdges };
-}
 
 /**
  * Crée OU met à jour (selon `currentDbId`) le document Appwrite du
@@ -650,7 +650,7 @@ function mergeGraphData(existing, fresh, runToken) {
  */
 async function persistGraphToDatabase() {
   const graphTitle = graphTitleEl.textContent.trim() ||
-    (selectedFile ? selectedFile.name.replace(/\.pdf$/i, "") : "Texte collé");
+  (sourcesArray.length > 0 ? sourcesArray[0].name.replace(/\.pdf$/i, "") : "Nouveau graphe");
   graphTitleEl.textContent = graphTitle;
 
   // نصيفطو ديما JSON string صحيحة (ماشي null/undefined) حيت Appwrite
@@ -729,7 +729,7 @@ function drawGraph() {
 
   // خيار "ajouter une source" ما كيبانش غير إيلا كاين ديجا غراف نقدرو
   // نزيدو عليه (ماشي أول extraction).
-  mergeToggleWrap.style.display = currentGraphData?.nodes?.length ? "flex" : "none";
+ 
 
   currentCy = renderGraph(currentGraphData, graphContainer, {
     confidenceThreshold: currentConfidenceThreshold,
@@ -952,34 +952,7 @@ function selectNodeInGraph(nodeId) {
   }
 }
 
-// ============================================================
-// "Aller à la source" — affiché dans le panel gauche (jamais en
-// popup ni en span : le résultat vit dans panel-left, surligné).
-// ============================================================
-function showSourceInLeftPanel({ sectionId, quote }) {
-  if (!currentSections) {
-    sourceResult.innerHTML = `<p class="empty-hint">Le texte source n'est pas disponible pour ce graphe (chargé depuis un ancien enregistrement).</p>`;
-  } else {
-    const section = sectionId
-      ? findSection(currentSections, sectionId)
-      : findSectionByQuote(currentSections, quote);
 
-    if (!section) {
-      sourceResult.innerHTML = `<p class="empty-hint">Impossible de retrouver ce passage dans le texte source.</p>`;
-    } else {
-      const { chunks } = highlightQuote(section.text, quote);
-      const body = chunks
-        .map((c) => (c.highlight ? `<mark>${escapeHtml(c.text)}</mark>` : escapeHtml(c.text)))
-        .join("");
-      sourceResult.innerHTML = `
-        <p class="source-heading">${escapeHtml(section.id)} — ${escapeHtml(section.heading)}</p>
-        ${body}`;
-    }
-  }
-
-  sourceResultBlock.scrollIntoView({ block: "start", behavior: "smooth" });
-  sourceResult.querySelector("mark")?.scrollIntoView({ block: "center", behavior: "smooth" });
-}
 
 // ============================================================
 // Inline chat (panel droit) — "Demander à l'IA"

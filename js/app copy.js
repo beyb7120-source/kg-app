@@ -161,9 +161,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // ---- DOM refs ----
 const graphTitleEl = document.getElementById("graphTitle");
 const apiKeyInput = document.getElementById("apiKey");
-const dropzone = document.getElementById("dropzone");
-const pdfInput = document.getElementById("pdfInput");
-const pasteText = document.getElementById("pasteText");
 const runBtn = document.getElementById("runBtn");
 const graphContainer = document.getElementById("graphContainer");
 const emptyState = document.getElementById("emptyState");
@@ -179,7 +176,6 @@ const arrangeGraphBtn = document.getElementById("arrangeGraphBtn");
 const confidenceSlider = document.getElementById("confidenceSlider");
 const confidenceValue = document.getElementById("confidenceValue");
 
-const mergeToggleWrap = document.getElementById("mergeToggleWrap");
 const mergeToggleCheckbox = document.getElementById("mergeToggleCheckbox");
 
 const jsonImportInput = document.getElementById("jsonImportInput");

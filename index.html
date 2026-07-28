@@ -87,36 +87,77 @@
 <main class="layout">
 
   <aside class="panel panel-left">
-    <section class="block">
-      <h2>01 — Source</h2>
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="pdfInput" accept="application/pdf" hidden />
-        <p><strong>Dépose un PDF</strong> ou clique pour choisir un fichier</p>
-        <p class="hint">PDF numérique uniquement (pas de scan/image) — voir README</p>
-      </div>
-      <p class="or-divider">— ou —</p>
-      <textarea id="pasteText" placeholder="colle le texte du cours ici..."></textarea>
-      <p class="or-divider">— ou —</p>
-      <input type="file" id="jsonImportInput" accept="application/json" hidden />
-      <button type="button" id="importJsonBtn" class="secondary-btn" aria-label="Importer un graphe déjà exporté en JSON">
-        <i class="fa-solid fa-file-import"></i> Importer un graphe (.json)
-      </button>
+    <!-- 1. مدير المصادر (Sources Manager) -->
+    <section class="block" id="sourcesManager">
+        <div class="sources-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">Sources</h2>
+            
+            <!-- احتفظنا بزر استيراد JSON القديم باش يبقى خدام -->
+            <input type="file" id="jsonImportInput" accept="application/json" hidden />
+            <button type="button" id="importJsonBtn" class="secondary-btn" style="padding: 6px 10px; font-size: 12px; border-radius: 8px;" aria-label="Importer un graphe JSON">
+                <i class="fa-solid fa-file-import"></i> JSON
+            </button>
+        </div>
+
+        <!-- زر إضافة مصادر جديدة -->
+        <button id="addSourceBtn" class="primary" style="width: 100%; border-radius: 20px; padding: 12px; margin-bottom: 20px; font-size: 14px; background-color: #3b3f46; color: white; border: 1px solid #4f545c;">
+            <i class="fa-solid fa-plus"></i> Add sources
+        </button>
+
+        <!-- زر تحديد الكل (Select all) -->
+        <div class="sources-list-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
+            <span style="color: var(--text-muted);"><i class="fa-solid fa-bars-staggered"></i></span>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 14px;">
+                Select all <input type="checkbox" id="selectAllSources" checked style="accent-color: #5865F2; width: 16px; height: 16px;">
+            </label>
+        </div>
+
+        <!-- لائحة المصادر (غادي تعمر بالـ JavaScript) -->
+        <ul id="sourcesList" class="sources-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
+            <!-- العناصر غتضاف هنا -->
+        </ul>
     </section>
 
-    <label class="inline-checkbox" id="mergeToggleWrap" style="display:none">
-      <input type="checkbox" id="mergeToggleCheckbox" />
-      Ajouter cette source au graphe actuel (au lieu de le remplacer)
-    </label>
+    <!-- زر تشغيل الـ AI -->
+    <button id="runBtn" class="run-btn" style="margin-top: auto; margin-bottom: 15px;">Lancer l'extraction</button>
 
-    <button id="runBtn" class="run-btn">Lancer l'extraction</button>
-
-    <section class="block source-result-block" id="sourceResultBlock">
-      <h2>02 — Source</h2>
-      <div id="sourceResult" class="source-result">
-        <p class="empty-hint">Clique sur « voir dans le texte source » pour afficher le passage ici.</p>
-      </div>
+    <!-- 2. عرض النص (View in Sources) - هادي غتكون مخفية فالأول -->
+    <section class="block source-result-block" id="sourceResultBlock" style="display: none; height: 100%; display: flex; flex-direction: column;">
+        <div class="source-result-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+            <h2 style="margin: 0;">View in sources</h2>
+            <button id="closeSourceResultBtn" class="close-btn" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="sourceResult" class="source-result" style="overflow-y: auto; flex-grow: 1;">
+            <p class="empty-hint">Clique sur « voir dans le texte source » pour afficher le passage ici.</p>
+        </div>
     </section>
-  </aside>
+</aside>
+
+<!-- 3. نافذة إضافة المصادر (Popup Modal) - هادي غتبان فوق كلشي -->
+<div id="addSourceModalBackdrop" class="modal-backdrop">
+    <div class="modal-body" style="text-align: center; max-width: 550px; border-radius: 12px; padding: 30px; background-color: #1e1e20;">
+        <button id="closeAddSourceModal" class="close-btn" style="position: absolute; top: 15px; right: 20px; background: none; border: none; color: white; cursor: pointer; font-size: 22px;">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        
+        <h2 style="margin-bottom: 30px; font-weight: normal;">Create your graph from your sources</h2>
+        
+        <div style="border: 1px dashed var(--border); border-radius: 12px; padding: 40px 20px; background-color: #242528;">
+            <h3 style="margin-bottom: 10px; font-weight: normal;">or drop your files</h3>
+            <p style="color: var(--text-muted); margin-bottom: 25px; font-size: 14px;">pdf, images, docs, audio, <a href="#" style="color: white; text-decoration: underline;">and more</a></p>
+            
+            <div class="add-source-options" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                <button id="uploadFilesBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-solid fa-arrow-up-from-bracket"></i> Upload files</button>
+                <button id="websitesBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-solid fa-link"></i> Websites</button>
+                <button id="driveBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-brands fa-google-drive"></i> Drive</button>
+                <button id="copiedTextBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-solid fa-clipboard"></i> Copied text</button>
+                <input type="file" id="multiPdfInput" multiple accept="application/pdf" style="display: none;">
+            </div>
+        </div>
+    </div>
+</div>
 
   <div class="resizer" id="resizerLeft" title="Glisser pour redimensionner"></div>
 
