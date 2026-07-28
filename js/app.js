@@ -534,7 +534,7 @@ websitesBtn.addEventListener("click", () => {
     websitesModalBackdrop.classList.add("open");
 });
 
-closeCopiedTextModal.addEventListener("click", closeSubModals);
+
 closeWebsitesModal.addEventListener("click", closeSubModals);
 
 backFromCopiedText.addEventListener("click", () => {
