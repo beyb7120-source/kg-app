@@ -866,3 +866,47 @@ body.theme-light .chat-input-row button { color: #ffffff; }
 .dropdown-content button:nth-child(2) {
     color: #e06b6b;
 }
+
+
+/* ============================================================
+   Fix Panels Height
+============================================================ */
+/* تأكد بلي الجسم ديال الصفحة واخد الطول كامل */
+html, body {
+    height: 100vh;
+    margin: 0;
+    overflow: hidden; /* باش ماتكونش 2 scrollbars */
+}
+
+/* تخلي الـ layout يعمر المساحة لي بقات تحت الهيدر */
+.layout {
+    display: flex; /* أو grid على حساب الكود القديم ديالك */
+    height: calc(100vh - 70px); /* نقص الطول ديال الهيدر الفوقاني (تقريبا 70px) */
+    min-height: 100%;
+}
+
+/* البانيلات (اليمين واليسار) والوسط ياخدو الطول كامل */
+.panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto; /* باش إيلا طوال المحتوى يبان السكرول لداخل */
+}
+
+/* المبيان فالوسط خصو يتكسل ويعمر البلاصة */
+#graphContainer {
+    flex-grow: 1;
+    height: 100%;
+}
+
+/* هادي باش مدير المصادر (Sources) يدفع الزر ديال Lancer l'extraction لتحت */
+#sourcesManager {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+#sourcesList {
+    flex-grow: 1;
+    overflow-y: auto;
+}

@@ -360,6 +360,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 // ---- DOM refs ----
 const graphTitleEl = document.getElementById("graphTitle");
 const apiKeyInput = document.getElementById("apiKey");
+// زيد هاد 3 السطور باش الكود يقرا الـ API Key لي كتبتي
+apiKeyInput.addEventListener("input", () => {
+    runtimeAuth.apiKey = apiKeyInput.value.trim();
+});
 const runBtn = document.getElementById("runBtn");
 const graphContainer = document.getElementById("graphContainer");
 const emptyState = document.getElementById("emptyState");
