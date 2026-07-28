@@ -380,7 +380,7 @@ const relationTypeSelect = document.getElementById("relationTypeSelect");
 const relationToSelect = document.getElementById("relationToSelect");
 
 const sourceResult = document.getElementById("sourceResult");
-const sourceResultBlock = document.getElementById("sourceResultBlock");
+
 
 const nodePopupBackdrop = document.getElementById("nodePopupBackdrop");
 const nodePopupBody = document.getElementById("nodePopupBody");
