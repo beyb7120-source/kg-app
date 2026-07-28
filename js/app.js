@@ -273,22 +273,50 @@ insertWebsitesBtn.addEventListener("click", () => {
 });
 
 
-// Google Drive Link Logic (ساهل، نقي، وماكيطلبش Google Verification)
-const driveLinkBtn = document.getElementById("driveLinkBtn"); // تأكد من الاسم الجديد
-
-driveLinkBtn.addEventListener("click", () => {
+driveBtn.addEventListener("click", async () => {
     addSourceModalBackdrop.classList.remove("open");
-    const link = prompt("Collez le lien de partage Google Drive (Document / PDF) :");
-    if (link && link.trim() !== "") {
-        sourcesArray.push({
-            id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
-            name: "Google Drive File (" + link.substring(0, 20) + "...)",
-            type: 'url', // كيعاملو بحال الرابط
-            data: link,
-            selected: true
-        });
-        renderSourcesList();
-        showToast("Lien Google Drive ajouté avec succès.", "success");
+    
+    try {
+        const session = await account.getSession('current');
+        const oauthToken = session.providerAccessToken;
+
+        if (!oauthToken) {
+            showToast("Erreur: Vous devez être connecté avec Google.", "error");
+            return;
+        }
+
+        // هاد gapi.load هو اللي كيخرج الـ Pop-up ديال Drive
+        gapi.load('picker', { 'callback': () => {
+            const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(false);
+
+            const picker = new google.picker.PickerBuilder()
+                .addView(view)
+                .setOAuthToken(oauthToken)
+                // حط الـ API Key ديالك هنا (وتأكد بلي داير ليه Restrictions: None فجوجل باش مايعطيكش 403)
+                .setDeveloperKey('حط_الـ_API_KEY_ديال_جوجل_هنا') 
+                .setCallback((data) => {
+                    if (data.action === google.picker.Action.PICKED) {
+                        data.docs.forEach(doc => {
+                            sourcesArray.push({
+                                id: doc.id,
+                                name: doc.name,
+                                type: 'drive',
+                                data: doc,
+                                selected: true
+                            });
+                        });
+                        renderSourcesList();
+                    }
+                })
+                .build();
+            picker.setVisible(true);
+        }});
+        
+    } catch (error) {
+        console.error("Erreur Drive Picker:", error);
+        showToast("Impossible d'ouvrir Google Drive.", "error");
     }
 });
 
