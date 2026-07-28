@@ -1,4 +1,4 @@
-// ============================================================
+/* // ============================================================
 // pdfReader.js — turns a File (PDF) into raw page text.
 // Scope note: this handles born-digital PDFs (real text layer).
 // Scanned/handwritten pages are OUT of scope for this MVP —
@@ -6,12 +6,9 @@
 // ============================================================
 
 // pdfjsLib is loaded globally via the <script> tag in index.html.
-/* global pdfjsLib */
+ 
 
-/**
- * @param {File} file
- * @returns {Promise<{pageNumber: number, text: string}[]>}
- */
+
 export async function extractPdfPages(file) {
   const buffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
@@ -42,12 +39,7 @@ export async function extractPdfPages(file) {
   return pages;
 }
 
-/**
- * Wraps plain pasted text in the same shape as extractPdfPages,
- * so the rest of the pipeline never needs to know the source.
- * @param {string} rawText
- * @returns {{pageNumber: number, text: string}[]}
- */
 export function wrapPastedText(rawText) {
   return [{ pageNumber: 1, text: rawText.trim() }];
 }
+ */

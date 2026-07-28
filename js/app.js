@@ -3,9 +3,10 @@
 // ============================================================
 
 import { runtimeAuth, RELATION_TYPES, RELATION_KEYS, DEFAULT_CONFIDENCE_THRESHOLD } from "./config.js";
+import { extractPdfPages, extractImageText, extractWebsiteText, extractDriveText, wrapPastedText } from "./sourceExtractor.js"; // <--- التغيير هنا
 import { extractPdfPages, wrapPastedText } from "./pdfReader.js";
 import { execute as runPipeline } from "./pipeline.js";
-import { render as renderGraph, updateThreshold } from "./graphRenderer.js";
+/* import { render as renderGraph, updateThreshold } from "./graphRenderer.js";*/
 import { getNodeRelations } from "./graphQueries.js";
 import { computeLearningPath } from "./learningPath.js";
 import { findSection, findSectionByQuote, highlightQuote } from "./sourceView.js";
@@ -635,16 +636,31 @@ runBtn.addEventListener("click", async () => {
 
     try {
         let allPages = [];
+        const session = await account.getSession('current').catch(() => null);
+        const oauthToken = session?.providerAccessToken;
         
         for (const source of selectedSources) {
+            setStage(`Lecture de la source: ${source.name}...`, "active");
+            
             if (source.type === 'pdf') {
                 const pages = await extractPdfPages(source.data);
                 allPages = allPages.concat(pages);
-            } else if (source.type === 'text') {
+            } 
+            else if (source.type === 'image' || source.data.type?.startsWith('image/')) {
+                const pages = await extractImageText(source.data);
+                allPages = allPages.concat(pages);
+            }
+            else if (source.type === 'text') {
                 const pages = wrapPastedText(source.data);
                 allPages = allPages.concat(pages);
-            } else if (source.type === 'url' || source.type === 'drive') {
-                const pages = wrapPastedText(`[Contenu de la source externe non implémenté localement: ${source.name}]`);
+            } 
+            else if (source.type === 'url') {
+                const pages = await extractWebsiteText(source.data);
+                allPages = allPages.concat(pages);
+            } 
+            else if (source.type === 'drive') {
+                if (!oauthToken) throw new Error("Token Drive expiré, veuillez vous reconnecter.");
+                const pages = await extractDriveText(source.data, oauthToken);
                 allPages = allPages.concat(pages);
             }
         }
@@ -653,17 +669,9 @@ runBtn.addEventListener("click", async () => {
             apiKey: runtimeAuth.apiKey,
             onProgress: (msg) => setStage(msg, "active"),
             onStageComplete: async (stageName, output) => {
-                if (stageName === "extraction") {
-                    currentSections = output;
-                } else if (stageName === "graph") {
-                    currentGraphData = output;
-                }
-                try {
-                    await persistGraphToDatabase();
-                } catch (saveError) {
-                    hasUnsavedFailure = true;
-                    console.error("Erreur de sauvegarde:", saveError);
-                }
+                if (stageName === "extraction") currentSections = output;
+                else if (stageName === "graph") currentGraphData = output;
+                try { await persistGraphToDatabase(); } catch (e) { hasUnsavedFailure = true; }
             }
         };
 

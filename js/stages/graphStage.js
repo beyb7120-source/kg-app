@@ -1,143 +1,126 @@
 // ============================================================
-// stages/graphStage.js — STAGE 2 of the pipeline.
-//
-// Same mold as stage 1: run(input, context) -> output.
-// Input here is stage 1's output (sections[]) — this stage never
-// sees raw PDF pages, it only ever sees clean structured text.
-//
-// This is the "brain" of the app: it identifies concepts (nodes)
-// and typed relations (edges) between them. Every rule here exists
-// because of a concrete failure mode discussed for this project:
-// hallucinated relations, invented facts from the model's training
-// data, ambiguous/bidirectional edges polluting the graph, etc.
+// stages/graphStage.js — STAGE 2 (Two-Stage Processing)
 // ============================================================
 
 import { callMistral } from "../mistralClient.js";
 import { MODELS, RELATION_TYPES, RELATION_KEYS } from "../config.js";
 
-function buildSystemInstruction() {
-  const vocabList = RELATION_TYPES.map((r) => `  - "${r.key}" : ${r.label}`).join("\n");
-
+// ------------------------------------------------------------
+// PHASE 1 : EXTRACTION DES NOEUDS (CONCEPTS)
+// ------------------------------------------------------------
+function buildNodesSystemInstruction() {
   return `
-Tu es un module d'EXTRACTION DE GRAPHE DE CONNAISSANCES à partir d'un document académique.
+Tu es un module d'EXTRACTION DE CONCEPTS à partir d'un document académique.
+Ta SEULE tâche est d'identifier les concepts clés mentionnés dans le texte.
+Tu NE DOIS PAS extraire de relations pour le moment.
 
-RÈGLES STRICTES, NON NÉGOCIABLES :
-
-1. VOCABULAIRE FERMÉ — le champ "type" de chaque relation doit être EXACTEMENT une de ces
-   valeurs, rien d'autre :
-${vocabList}
-
-2. EXTRACTION UNIQUEMENT — tu extrais ce qui est ÉCRIT ou clairement IMPLIQUÉ dans le texte
-   fourni. Tu N'UTILISES JAMAIS tes connaissances générales du domaine pour ajouter un concept
-   ou une relation qui ne provient pas de CE texte précis. Si un lien te semble "vrai en
-   général" mais n'est pas soutenu par le texte fourni, tu ne l'inclus PAS.
-
-3. GROUNDING OBLIGATOIRE — pour CHAQUE nœud et CHAQUE relation, "sourceQuote" doit être un
-   passage court (une phrase ou moins) copié du texte source qui justifie ton extraction.
-   Si tu ne peux pas citer un passage précis, n'extrais pas cet élément.
-
-4. REJETTE L'AMBIGU — si une relation entre deux concepts est bidirectionnelle, vague, ou si
-   tu hésites sur le sens (A→B ou B→A), NE L'INCLUS PAS DU TOUT plutôt que de deviner.
-   Un graphe incomplet mais fiable vaut mieux qu'un graphe complet mais faux.
-
-5. CONFIANCE HONNÊTE — le champ "confidence" (0 à 1) doit refléter ta certitude réelle que
-   cette relation est explicitement soutenue par le texte. Ne mets pas systématiquement des
-   scores élevés.
-
-6. Ne crée pas de doublons conceptuels : si "débit volumique" et "débit" désignent la même
-   chose dans le texte, un seul nœud.
-
-7. Préserve la langue originale du document dans "label" et "definition". Ne traduis pas.
-
-8. "definition" doit être courte (1-2 phrases), basée strictement sur le texte, jamais une
-   définition générique tirée de tes connaissances générales.
+RÈGLES STRICTES :
+1. EXTRACTION UNIQUEMENT — extrais ce qui est ÉCRIT dans le texte. N'invente rien.
+2. GROUNDING OBLIGATOIRE — "sourceQuote" doit être une phrase exacte du texte source.
+3. "definition" doit être courte (1-2 phrases), basée strictement sur le texte.
+4. Préserve la langue originale du document.
+5. Ne crée pas de doublons conceptuels.
 `.trim();
 }
 
-// Mistral JSON mode guarantees valid JSON, not a specific shape or enum —
-// so the exact structure AND the closed vocabulary have to be taught by
-// example, and enforced again ourselves once the response comes back
-// (see validateGraph below). This is the direct consequence of losing
-// Gemini's responseSchema/enum enforcement.
-const SCHEMA_EXAMPLE = JSON.stringify(
-  {
-    nodes: [
-      {
-        id: "n1",
-        label: "Nom du concept (langue du document)",
-        definition: "Définition courte, basée strictement sur le texte source",
-        sourceQuote: "passage exact copié du texte source",
-        sourceSectionId: "s1",
-      },
-    ],
-    edges: [
-      {
-        id: "e1",
-        source: "n1",
-        target: "n2",
-        type: `un parmi: ${RELATION_KEYS.join(", ")}`,
-        sourceQuote: "passage exact copié du texte source",
-        confidence: 0.85,
-      },
-    ],
-  },
-  null,
-  2
-);
+const SCHEMA_NODES = JSON.stringify({
+  nodes: [
+    {
+      id: "n1",
+      label: "Nom du concept",
+      definition: "Définition stricte tirée du texte",
+      sourceQuote: "passage exact copié du texte source",
+      sourceSectionId: "s1"
+    }
+  ]
+}, null, 2);
 
-/** Defensive validation: drops anything malformed rather than crashing the renderer. */
-function validateGraph(raw) {
-  const nodes = (Array.isArray(raw.nodes) ? raw.nodes : []).filter(
-    (n) =>
-      n &&
-      typeof n.id === "string" &&
-      typeof n.label === "string" &&
-      typeof n.definition === "string" &&
-      typeof n.sourceQuote === "string"
-  );
+// ------------------------------------------------------------
+// PHASE 2 : EXTRACTION DES RELATIONS (EDGES)
+// ------------------------------------------------------------
+function buildEdgesSystemInstruction() {
+  const vocabList = RELATION_TYPES.map((r) => ` - "${r.key}" : ${r.label}`).join("\n");
+  
+  return `
+Tu es un module d'EXTRACTION DE RELATIONS. Tu vas recevoir un texte académique ET 
+une liste stricte de concepts (nœuds) qui ont déjà été extraits de ce texte.
+Ta SEULE tâche est de trouver les liens logiques entre CES concepts spécifiques.
 
-  const nodeIds = new Set(nodes.map((n) => n.id));
-
-  const edges = (Array.isArray(raw.edges) ? raw.edges : []).filter(
-    (e) =>
-      e &&
-      typeof e.id === "string" &&
-      nodeIds.has(e.source) &&
-      nodeIds.has(e.target) &&
-      RELATION_KEYS.includes(e.type) &&
-      typeof e.confidence === "number" &&
-      e.confidence >= 0 &&
-      e.confidence <= 1
-  );
-
-  return { nodes, edges };
+RÈGLES STRICTES :
+1. VOCABULAIRE FERMÉ — le type de relation doit être EXACTEMENT :
+${vocabList}
+2. UTILISE UNIQUEMENT LES IDs FOURNIS — la "source" et la "target" doivent correspondre aux IDs des concepts fournis.
+3. GROUNDING OBLIGATOIRE — "sourceQuote" doit être le passage exact qui prouve ce lien.
+4. REJETTE L'AMBIGU — en cas de doute sur le sens de la relation, ne l'inclus pas.
+5. CONFIANCE — "confidence" (0 à 1) reflète ta certitude.
+`.trim();
 }
 
-/**
- * @param {{id:string, heading:string, text:string}[]} sections — stage 1 output
- * @param {{apiKey:string, onProgress?:Function}} context
- * @returns {Promise<{nodes:Object[], edges:Object[]}>}
- */
+const SCHEMA_EDGES = JSON.stringify({
+  edges: [
+    {
+      id: "e1",
+      source: "ID_du_concept_source (ex: n1)",
+      target: "ID_du_concept_cible (ex: n2)",
+      type: `un parmi: ${RELATION_KEYS.join(", ")}`,
+      sourceQuote: "passage exact copié du texte source",
+      confidence: 0.85
+    }
+  ]
+}, null, 2);
+
+// ------------------------------------------------------------
+// VALIDATION
+// ------------------------------------------------------------
+function validateNodes(raw) {
+  return (Array.isArray(raw?.nodes) ? raw.nodes : []).filter(
+    (n) => n && typeof n.id === "string" && typeof n.label === "string" && typeof n.sourceQuote === "string"
+  );
+}
+
+function validateEdges(raw, validNodeIds) {
+  return (Array.isArray(raw?.edges) ? raw.edges : []).filter(
+    (e) => e && typeof e.id === "string" && validNodeIds.has(e.source) && validNodeIds.has(e.target) && RELATION_KEYS.includes(e.type)
+  );
+}
+
+// ------------------------------------------------------------
+// ORCHESTRATION
+// ------------------------------------------------------------
 export async function run(sections, context) {
-  const userText = sections
-    .map((s) => `### Section ${s.id} — ${s.heading}\n${s.text}`)
-    .join("\n\n");
+  const userText = sections.map((s) => `### Section ${s.id} — ${s.heading}\n${s.text}`).join("\n\n");
 
-  context.onProgress?.("Extraction des concepts et des relations...");
-
-  const result = await callMistral({
+  // --- ÉTAPE 1 : Extraire les concepts ---
+  context.onProgress?.("Étape 1/2 : Extraction des concepts (Nodes)...");
+  const nodesResult = await callMistral({
     apiKey: context.apiKey,
     model: MODELS.reasoning,
-    systemInstruction: buildSystemInstruction(),
-    schemaExample: SCHEMA_EXAMPLE,
+    systemInstruction: buildNodesSystemInstruction(),
+    schemaExample: SCHEMA_NODES,
     userText,
     onProgress: context.onProgress,
   });
 
-  const graph = validateGraph(result);
-  if (!graph.nodes.length) {
-    throw new Error("Aucun concept valide n'a pu être extrait (vérifie la clé API et réessaie).");
-  }
+  const nodes = validateNodes(nodesResult);
+  if (!nodes.length) throw new Error("Aucun concept valide n'a pu être extrait.");
 
-  return graph;
+  // --- ÉTAPE 2 : Extraire les relations ---
+  context.onProgress?.("Étape 2/2 : Analyse des liens logiques (Edges)...");
+  
+  // On fournit au modèle le texte ET les concepts trouvés à l'étape 1
+  const edgesUserText = `TEXTE SOURCE :\n${userText}\n\nCONCEPTS EXTRAITS :\n${JSON.stringify(nodes, null, 2)}`;
+  
+  const edgesResult = await callMistral({
+    apiKey: context.apiKey,
+    model: MODELS.reasoning,
+    systemInstruction: buildEdgesSystemInstruction(),
+    schemaExample: SCHEMA_EDGES,
+    userText: edgesUserText,
+    onProgress: context.onProgress,
+  });
+
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const edges = validateEdges(edgesResult, nodeIds);
+
+  return { nodes, edges };
 }
