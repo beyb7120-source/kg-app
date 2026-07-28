@@ -272,7 +272,9 @@ insertWebsitesBtn.addEventListener("click", () => {
     }
 });
 
-
+// ============================================================
+// Google Drive Picker Logic (Pop-up الأصلية)
+// ============================================================
 driveBtn.addEventListener("click", async () => {
     addSourceModalBackdrop.classList.remove("open");
     
@@ -281,11 +283,10 @@ driveBtn.addEventListener("click", async () => {
         const oauthToken = session.providerAccessToken;
 
         if (!oauthToken) {
-            showToast("Erreur: Vous devez être connecté avec Google.", "error");
+            showToast("Erreur: Vous devez être connecté avec Google pour utiliser Drive.", "error");
             return;
         }
 
-        // هاد gapi.load هو اللي كيخرج الـ Pop-up ديال Drive
         gapi.load('picker', { 'callback': () => {
             const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
                 .setIncludeFolders(true)
@@ -294,8 +295,7 @@ driveBtn.addEventListener("click", async () => {
             const picker = new google.picker.PickerBuilder()
                 .addView(view)
                 .setOAuthToken(oauthToken)
-                // حط الـ API Key ديالك هنا (وتأكد بلي داير ليه Restrictions: None فجوجل باش مايعطيكش 403)
-                .setDeveloperKey('حط_الـ_API_KEY_ديال_جوجل_هنا') 
+                .setDeveloperKey('AIzaSyA2_N99wifB_dZrqsSynaKj-8yhJxqJ5Vw') // حط الـ API Key الحقيقي هنا
                 .setCallback((data) => {
                     if (data.action === google.picker.Action.PICKED) {
                         data.docs.forEach(doc => {
@@ -315,7 +315,7 @@ driveBtn.addEventListener("click", async () => {
         }});
         
     } catch (error) {
-        console.error("Erreur Drive Picker:", error);
+        console.error("Erreur de session Appwrite:", error);
         showToast("Impossible d'ouvrir Google Drive.", "error");
     }
 });
