@@ -45,6 +45,14 @@ let isOwner = true;
 let currentGraphOwnerId = null;
 let currentUserRole = 'owner';
 
+function updateAccessButtonsVisibility() {
+    document.getElementById('openShareModalBtn').style.display = isOwner ? 'block' : 'none';
+    document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
+    document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
+    const copyLinkBtn = document.getElementById('copyLinkBtn');
+    if (copyLinkBtn) copyLinkBtn.style.display = currentDbId ? 'block' : 'none';
+}
+
 const teamIdParam = urlParams.get('teamId');
 const membershipIdParam = urlParams.get('membershipId');
 const userIdParam = urlParams.get('userId');
@@ -264,50 +272,23 @@ insertWebsitesBtn.addEventListener("click", () => {
     }
 });
 
-// Google Drive Logic
-// Google Drive Logic
-driveBtn.addEventListener("click", async () => {
+
+// Google Drive Link Logic (ساهل، نقي، وماكيطلبش Google Verification)
+const driveLinkBtn = document.getElementById("driveLinkBtn"); // تأكد من الاسم الجديد
+
+driveLinkBtn.addEventListener("click", () => {
     addSourceModalBackdrop.classList.remove("open");
-    
-    try {
-        const session = await account.getSession('current');
-        const oauthToken = session.providerAccessToken;
-
-        if (!oauthToken) {
-            showToast("Erreur: Vous devez être connecté avec Google pour utiliser Drive.", "error");
-            return;
-        }
-
-        gapi.load('picker', { 'callback': () => {
-            const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-                .setIncludeFolders(true)
-                .setSelectFolderEnabled(false);
-
-            const picker = new google.picker.PickerBuilder()
-                .addView(view)
-                .setOAuthToken(oauthToken)
-                .setDeveloperKey('AIzaSyA2_N99wifB_dZrqsSynaKj-8yhJxqJ5Vw') // <--- هاد السطر هو لي كيحل مشكل 403
-                .setCallback((data) => {
-                    if (data.action === google.picker.Action.PICKED) {
-                        data.docs.forEach(doc => {
-                            sourcesArray.push({
-                                id: doc.id,
-                                name: doc.name,
-                                type: 'drive',
-                                data: doc,
-                                selected: true
-                            });
-                        });
-                        renderSourcesList();
-                    }
-                })
-                .build();
-            picker.setVisible(true);
-        }});
-        
-    } catch (error) {
-        console.error("Erreur de session Appwrite:", error);
-        showToast("Impossible de vérifier l'authentification Google.", "error");
+    const link = prompt("Collez le lien de partage Google Drive (Document / PDF) :");
+    if (link && link.trim() !== "") {
+        sourcesArray.push({
+            id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
+            name: "Google Drive File (" + link.substring(0, 20) + "...)",
+            type: 'url', // كيعاملو بحال الرابط
+            data: link,
+            selected: true
+        });
+        renderSourcesList();
+        showToast("Lien Google Drive ajouté avec succès.", "success");
     }
 });
 
