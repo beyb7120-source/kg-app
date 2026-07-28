@@ -4,9 +4,9 @@
 
 import { runtimeAuth, RELATION_TYPES, RELATION_KEYS, DEFAULT_CONFIDENCE_THRESHOLD } from "./config.js";
 import { extractPdfPages, extractImageText, extractWebsiteText, extractDriveText, wrapPastedText } from "./sourceExtractor.js"; // <--- التغيير هنا
-import { extractPdfPages, wrapPastedText } from "./pdfReader.js";
-import { execute as runPipeline } from "./pipeline.js";
-/* import { render as renderGraph, updateThreshold } from "./graphRenderer.js";*/
+/* import { extractPdfPages, wrapPastedText } from "./pdfReader.js";
+ */import { execute as runPipeline } from "./pipeline.js";
+import { render as renderGraph, updateThreshold } from "./graphRenderer.js";
 import { getNodeRelations } from "./graphQueries.js";
 import { computeLearningPath } from "./learningPath.js";
 import { findSection, findSectionByQuote, highlightQuote } from "./sourceView.js";
