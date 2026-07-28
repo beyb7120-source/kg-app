@@ -338,7 +338,7 @@ if (driveBtn) {
                 const picker = new google.picker.PickerBuilder()
                     .addView(view)
                     .setOAuthToken(oauthToken)
-                    .setDeveloperKey('حط_الـ_API_KEY_ديال_جوجل_هنا')
+                    .setDeveloperKey('AIzaSyA2_N99wifB_dZrqsSynaKj-8yhJxqJ5Vw')
                     .setCallback((data) => {
                         if (data.action === google.picker.Action.PICKED) {
                             data.docs.forEach(doc => {
