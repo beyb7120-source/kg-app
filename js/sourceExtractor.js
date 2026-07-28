@@ -1,6 +1,5 @@
 // ============================================================
-// sourceExtractor.js — Multi-source Data Ingestion
-// Gère l'extraction de texte depuis PDF, Drive, Images, et Web.
+// sourceExtractor.js — Multi-source Data Ingestion (FIXED)
 // ============================================================
 
 /* global pdfjsLib, Tesseract */
@@ -23,36 +22,54 @@ export async function extractPdfPages(file) {
 // --- Images (OCR avec Tesseract.js) ---
 export async function extractImageText(file) {
   if (typeof Tesseract === "undefined") throw new Error("Tesseract.js n'est pas chargé.");
-  const result = await Tesseract.recognize(file, 'fra+eng'); // Support Français et Anglais
+  const result = await Tesseract.recognize(file, 'fra+eng');
   return [{ pageNumber: 1, text: result.data.text.trim() }];
 }
 
-// --- Sites Web (Scraping via un Proxy public) ---
+// --- Sites Web & YouTube (CORRIGÉ) ---
 export async function extractWebsiteText(url) {
   try {
-    // On utilise allorigins pour contourner les blocages CORS côté navigateur
+    // 1. حماية خاصة بيوتيوب (مستحيل قراءته عبر HTML بسيط)
+    if (url.includes("youtube.com") || url.includes("youtu.be")) {
+      throw new Error("Impossible d'extraire directement depuis YouTube (protection client-side). Veuillez copier/coller le texte (Transcript) manuellement.");
+    }
+
+    // 2. محاولة قراءة المواقع العادية
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
-    if (!response.ok) throw new Error("Erreur réseau.");
-    const data = await response.json();
     
-    // Nettoyage de l'HTML pour garder que le texte lisible
+    // إيلا البروكسي طاح بحال (408 Timeout)
+    if (!response.ok) throw new Error(`Le proxy a retourné une erreur (${response.status})`);
+    
+    const data = await response.json();
+    if (!data.contents) throw new Error("Le site a bloqué la lecture ou le contenu est vide.");
+
     const parser = new DOMParser();
     const doc = parser.parseFromString(data.contents, 'text/html');
     const text = doc.body.innerText.replace(/\s+/g, ' ').trim();
-    return [{ pageNumber: 1, text: text.substring(0, 50000) }]; // Limite pour éviter les plantages
+    
+    if (text.length < 50) {
+      throw new Error("Le texte extrait est trop court (le site bloque peut-être le scraping).");
+    }
+
+    return [{ pageNumber: 1, text: text.substring(0, 50000) }];
   } catch (error) {
-    throw new Error(`Impossible de lire le site : ${url}`);
+    throw new Error(`Impossible de lire le lien: ${error.message}`);
   }
 }
 
-// --- Google Drive (Exportation de document) ---
+// --- Google Drive (CORRIGÉ) ---
 export async function extractDriveText(docData, oauthToken) {
-  // Si c'est un Google Doc, on l'exporte en texte brut.
   if (docData.mimeType === "application/vnd.google-apps.document") {
     const response = await fetch(`https://www.googleapis.com/drive/v3/files/${docData.id}/export?mimeType=text/plain`, {
       headers: { Authorization: `Bearer ${oauthToken}` }
     });
+    
+    // 🛑 هادي هي اللي كانت ناقصة وخلاتو يرسم ليك مبيان ديال 403 🛑
+    if (!response.ok) {
+      throw new Error(`Google Drive a refusé l'accès (Erreur ${response.status}). Vérifiez les permissions de l'API.`);
+    }
+
     const text = await response.text();
     return [{ pageNumber: 1, text: text.trim() }];
   } else {
