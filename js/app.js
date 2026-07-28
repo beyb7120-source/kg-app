@@ -109,10 +109,7 @@ websitesBtn.addEventListener("click", () => {
     websitesModalBackdrop.classList.add("open");
 });
 
-const closeSubModals = () => {
-    copiedTextModalBackdrop.classList.remove("open");
-    websitesModalBackdrop.classList.remove("open");
-};
+
 closeCopiedTextModal.addEventListener("click", closeSubModals);
 closeWebsitesModal.addEventListener("click", closeSubModals);
 
