@@ -276,7 +276,50 @@ insertWebsitesBtn.addEventListener("click", () => {
 // Google Drive Picker Logic (Pop-up الأصلية)
 // ============================================================
 // Google Drive Picker Logic (آمن ضد الأخطاء إذا كان الزر غير موجود)
-const driveBtn = document.getElementById("driveBtn") || document.getElementById("driveLinkBtn");
+driveBtn.addEventListener("click", async () => {
+    addSourceModalBackdrop?.classList.remove("open");
+    
+    try {
+        const session = await account.getSession('current');
+        const oauthToken = session.providerAccessToken;
+
+        if (!oauthToken) {
+            showToast("Erreur: Vous devez être connecté avec Google.", "error");
+            return;
+        }
+
+        gapi.load('picker', { 'callback': () => {
+            const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(false);
+
+            const picker = new google.picker.PickerBuilder()
+                .addView(view)
+                .setOAuthToken(oauthToken)
+                .setDeveloperKey('حط_الـ_API_KEY_ديال_جوجل_هنا') 
+                .setCallback((data) => {
+                    if (data.action === google.picker.Action.PICKED) {
+                        data.docs.forEach(doc => {
+                            sourcesArray.push({
+                                id: doc.id,
+                                name: doc.name,
+                                type: 'drive',
+                                data: doc,
+                                selected: true
+                            });
+                        });
+                        renderSourcesList();
+                    }
+                })
+                .build();
+            picker.setVisible(true);
+        }});
+        
+    } catch (error) {
+        console.error("Erreur Drive Picker:", error);
+        showToast("Impossible d'ouvrir Google Drive.", "error");
+    }
+});
 
 if (driveBtn) {
     driveBtn.addEventListener("click", async () => {
