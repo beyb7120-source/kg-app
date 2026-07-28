@@ -523,7 +523,13 @@ initThemeToggle(themeToggleBtn);
 // Logic for Sub-Modals (Websites & Copied Text)
 // ============================================================
 
-// فتح النوافذ الفرعية
+// 1. الدالة ديال الإغلاق (استعملنا function باش تقرا من أي بلاصة بلا مشاكل)
+function closeSubModals() {
+    copiedTextModalBackdrop.classList.remove("open");
+    websitesModalBackdrop.classList.remove("open");
+}
+
+// 2. دوال الفتح
 copiedTextBtn.addEventListener("click", () => {
     addSourceModalBackdrop.classList.remove("open");
     copiedTextModalBackdrop.classList.add("open");
@@ -534,18 +540,20 @@ websitesBtn.addEventListener("click", () => {
     websitesModalBackdrop.classList.add("open");
 });
 
-
+// 3. دوال الإغلاق
+closeCopiedTextModal.addEventListener("click", closeSubModals);
 closeWebsitesModal.addEventListener("click", closeSubModals);
 
+// 4. دوال الرجوع (Back)
 backFromCopiedText.addEventListener("click", () => {
     closeSubModals();
     addSourceModalBackdrop.classList.add("open");
 });
+
 backFromWebsites.addEventListener("click", () => {
     closeSubModals();
     addSourceModalBackdrop.classList.add("open");
 });
-
 // إدراج النص المنسوخ (Insert Copied Text)
 insertCopiedTextBtn.addEventListener("click", () => {
     const text = copiedTextInput.value.trim();
