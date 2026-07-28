@@ -867,46 +867,60 @@ body.theme-light .chat-input-row button { color: #ffffff; }
     color: #e06b6b;
 }
 
-
 /* ============================================================
-   Fix Panels Height
+   Multi-Source UI Styles & Fixes
 ============================================================ */
-/* تأكد بلي الجسم ديال الصفحة واخد الطول كامل */
-html, body {
-    height: 100vh;
-    margin: 0;
-    overflow: hidden; /* باش ماتكونش 2 scrollbars */
+/* جعل الـ modal-body relative باش زر X يشد بلاصتو لداخل */
+.modal-body {
+    position: relative;
 }
 
-/* تخلي الـ layout يعمر المساحة لي بقات تحت الهيدر */
-.layout {
-    display: flex; /* أو grid على حساب الكود القديم ديالك */
-    height: calc(100vh - 70px); /* نقص الطول ديال الهيدر الفوقاني (تقريبا 70px) */
-    min-height: 100%;
-}
-
-/* البانيلات (اليمين واليسار) والوسط ياخدو الطول كامل */
-.panel {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow-y: auto; /* باش إيلا طوال المحتوى يبان السكرول لداخل */
-}
-
-/* المبيان فالوسط خصو يتكسل ويعمر البلاصة */
-#graphContainer {
-    flex-grow: 1;
-    height: 100%;
-}
-
-/* هادي باش مدير المصادر (Sources) يدفع الزر ديال Lancer l'extraction لتحت */
+/* ترتيب مدير المصادر باش يعمر الشاشة ويدفع الزر لتحت */
 #sourcesManager {
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    flex: 1;
+    min-height: 0;
+}
+#sourcesList {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+#runBtn {
+    margin-top: auto;
+    flex-shrink: 0;
 }
 
-#sourcesList {
-    flex-grow: 1;
-    overflow-y: auto;
+/* تصميم لائحة المصادر */
+.sources-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background-color: transparent;
+    border-radius: 8px;
+    transition: background-color 0.2s;
 }
+.sources-list li:hover { background-color: rgba(255, 255, 255, 0.05); }
+.source-info { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--text-primary); }
+.source-info i { color: #ed4245; font-size: 18px; }
+.source-actions { display: flex; align-items: center; gap: 15px; }
+
+/* تصميم الـ Checkbox والـ Dropdown */
+.source-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: #5865F2; }
+.dots-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; padding: 5px; }
+.dots-btn:hover { color: var(--text-primary); }
+.dropdown { position: relative; display: inline-block; }
+.dropdown-content {
+    display: none; position: absolute; right: 25px; top: 0;
+    background-color: #2b2d31; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
+    z-index: 100; border-radius: 8px; border: 1px solid var(--border); padding: 5px;
+}
+.dropdown-content.show { display: flex; flex-direction: column; }
+.dropdown-content button {
+    background: none; border: none; color: var(--text-primary); padding: 10px 12px;
+    text-align: left; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 14px;
+}
+.dropdown-content button:hover { background-color: #3f4147; }
+.dropdown-content button:nth-child(2) { color: #e06b6b; }

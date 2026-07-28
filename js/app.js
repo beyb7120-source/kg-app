@@ -82,6 +82,7 @@ const membershipIdParam = urlParams.get('membershipId');
 const userIdParam = urlParams.get('userId');
 const secretParam = urlParams.get('secret');
 
+// DOM refs الجداد ديال النوافذ
 const copiedTextBtn = document.getElementById("copiedTextBtn");
 const copiedTextModalBackdrop = document.getElementById("copiedTextModalBackdrop");
 const closeCopiedTextModal = document.getElementById("closeCopiedTextModal");
@@ -97,6 +98,89 @@ const insertWebsitesBtn = document.getElementById("insertWebsitesBtn");
 const websitesInput = document.getElementById("websitesInput");
 
 const driveBtn = document.getElementById("driveBtn");
+
+// دوال الفتح والإغلاق
+copiedTextBtn.addEventListener("click", () => {
+    addSourceModalBackdrop.classList.remove("open");
+    copiedTextModalBackdrop.classList.add("open");
+});
+websitesBtn.addEventListener("click", () => {
+    addSourceModalBackdrop.classList.remove("open");
+    websitesModalBackdrop.classList.add("open");
+});
+
+const closeSubModals = () => {
+    copiedTextModalBackdrop.classList.remove("open");
+    websitesModalBackdrop.classList.remove("open");
+};
+closeCopiedTextModal.addEventListener("click", closeSubModals);
+closeWebsitesModal.addEventListener("click", closeSubModals);
+
+backFromCopiedText.addEventListener("click", () => {
+    closeSubModals();
+    addSourceModalBackdrop.classList.add("open");
+});
+backFromWebsites.addEventListener("click", () => {
+    closeSubModals();
+    addSourceModalBackdrop.classList.add("open");
+});
+
+// إدراج النص
+insertCopiedTextBtn.addEventListener("click", () => {
+    const text = copiedTextInput.value.trim();
+    if (text) {
+        sourcesArray.push({
+            id: Date.now().toString(36),
+            name: "Texte copié",
+            type: 'text',
+            data: text,
+            selected: true
+        });
+        copiedTextInput.value = "";
+        closeSubModals();
+        renderSourcesList();
+    }
+});
+
+// Google Drive Logic
+driveBtn.addEventListener("click", () => {
+    addSourceModalBackdrop.classList.remove("open");
+    
+    // بما أنك كدير Sign-in بجوجل عبر Appwrite
+    // تقدر تجيب Token ديال الـ Session بحال هكا (إيلا كنتي عاطي scopes ديال drive):
+    // const session = await account.getSession('current');
+    // const providerAccessToken = session.providerAccessToken;
+
+    // كمثال للـ Picker:
+    gapi.load('picker', { 'callback': () => {
+        const oauthToken = window.GOOGLE_OAUTH_TOKEN || prompt("Token OAuth Google nécessaire pour Drive:");
+        if (!oauthToken) return;
+
+        const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
+            .setIncludeFolders(true)
+            .setSelectFolderEnabled(false);
+
+        const picker = new google.picker.PickerBuilder()
+            .addView(view)
+            .setOAuthToken(oauthToken)
+            .setCallback((data) => {
+                if (data.action === google.picker.Action.PICKED) {
+                    data.docs.forEach(doc => {
+                        sourcesArray.push({
+                            id: doc.id,
+                            name: doc.name,
+                            type: 'drive',
+                            data: doc,
+                            selected: true
+                        });
+                    });
+                    renderSourcesList();
+                }
+            })
+            .build();
+        picker.setVisible(true);
+    }});
+});
 
 
 // ============================================================

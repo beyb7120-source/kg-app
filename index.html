@@ -87,129 +87,118 @@
 
 <main class="layout">
 
-  <aside class="panel panel-left">
-    <!-- 1. مدير المصادر (Sources Manager) -->
-    <section class="block" id="sourcesManager">
+  <aside class="panel panel-left" style="display: flex; flex-direction: column;">
+    <!-- 1. مدير المصادر (مخفي ملي كنكليكيو على View Source) -->
+    <section class="block" id="sourcesManager" style="display: flex; flex-direction: column; flex: 1;">
         <div class="sources-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="margin: 0;">Sources</h2>
-            
-            <!-- احتفظنا بزر استيراد JSON القديم باش يبقى خدام -->
+            <h2 style="margin: 0; color: var(--text-muted);">SOURCES</h2>
             <input type="file" id="jsonImportInput" accept="application/json" hidden />
-            <button type="button" id="importJsonBtn" class="secondary-btn" style="padding: 6px 10px; font-size: 12px; border-radius: 8px;" aria-label="Importer un graphe JSON">
+            <button type="button" id="importJsonBtn" class="secondary-btn" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; width: auto;">
                 <i class="fa-solid fa-file-import"></i> JSON
             </button>
         </div>
 
-        <!-- زر إضافة مصادر جديدة -->
-        <button id="addSourceBtn" class="primary" style="width: 100%; border-radius: 20px; padding: 12px; margin-bottom: 20px; font-size: 14px; background-color: #3b3f46; color: white; border: 1px solid #4f545c;">
+        <button id="addSourceBtn" style="width: 100%; border-radius: 20px; padding: 10px; margin-bottom: 20px; font-size: 13px; background-color: #3b3f46; color: white; border: 1px solid #4f545c; cursor: pointer; transition: 0.2s;">
             <i class="fa-solid fa-plus"></i> Add sources
         </button>
 
-        <!-- زر تحديد الكل (Select all) -->
-        <div class="sources-list-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
-            <span style="color: var(--text-muted);"><i class="fa-solid fa-bars-staggered"></i></span>
-            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 14px;">
-                Select all <input type="checkbox" id="selectAllSources" checked style="accent-color: #5865F2; width: 16px; height: 16px;">
+        <div class="sources-list-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px;">
+            <span style="color: var(--text-muted); cursor: pointer;"><i class="fa-solid fa-bars-staggered"></i></span>
+            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 13px;">
+                Select all <input type="checkbox" id="selectAllSources" checked class="source-checkbox">
             </label>
         </div>
 
-        <!-- لائحة المصادر (غادي تعمر بالـ JavaScript) -->
-        <ul id="sourcesList" class="sources-list" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px;">
-            <!-- العناصر غتضاف هنا -->
-        </ul>
+        <ul id="sourcesList" class="sources-list"></ul>
+        
+        <button id="runBtn" class="run-btn">Lancer l'extraction</button>
     </section>
 
-    <!-- زر تشغيل الـ AI -->
-    <button id="runBtn" class="run-btn" style="margin-top: auto; margin-bottom: 15px;">Lancer l'extraction</button>
-
-    <!-- 2. عرض النص (View in Sources) - هادي غتكون مخفية فالأول -->
-    <!-- هادا خصو يكون مخفي فالأول (display: none) -->
-<section class="block source-result-block" id="sourceResultBlock" style="display: none; height: 100%; flex-direction: column;">
-    <div class="source-result-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-        <h2 style="margin: 0;">View in sources</h2>
-        <button id="closeSourceResultBtn" class="close-btn" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-    </div>
-    <div id="sourceResult" class="source-result" style="overflow-y: auto; flex-grow: 1;">
-        <!-- هنا كيبان النص الملون -->
-    </div>
-</section>
+    <!-- 2. عرض النص (View in Sources) - مخفي أوتوماتيكيا -->
+    <section class="block source-result-block" id="sourceResultBlock" style="display: none; height: 100%; flex-direction: column;">
+        <div class="source-result-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+            <h2 style="margin: 0;">View in sources</h2>
+            <button id="closeSourceResultBtn" class="close-btn" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="sourceResult" class="source-result" style="overflow-y: auto; flex-grow: 1;"></div>
+    </section>
+</aside>
 
 <!-- ========================================== -->
-<!-- 1. نافذة: Paste copied text -->
+<!-- 3. نافذة إضافة المصادر (القائمة الرئيسية) -->
+<!-- ========================================== -->
+<div id="addSourceModalBackdrop" class="modal-backdrop">
+    <div class="modal-body" style="text-align: center; width: 600px; max-width: 90vw; border-radius: 12px; padding: 40px; background-color: #111214;">
+        <button id="closeAddSourceModal" class="close-btn" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; cursor: pointer; font-size: 22px;"><i class="fa-solid fa-xmark"></i></button>
+        
+        <h2 style="margin-bottom: 30px; font-weight: normal; font-size: 22px; color: white; text-transform: none;">Create your graph from your sources</h2>
+        
+        <div style="border: 1px dashed #3f4147; border-radius: 12px; padding: 40px 20px; background-color: #1e1f22;">
+            <h3 style="margin-bottom: 10px; font-weight: normal; font-size: 18px;">or drop your files</h3>
+            <p style="color: var(--text-muted); margin-bottom: 30px; font-size: 14px;">pdf, images, docs, audio, <span style="color: #b9bbbe; text-decoration: underline; cursor: pointer;">and more</span></p>
+            
+            <div class="add-source-options" style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
+                <button id="uploadFilesBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-solid fa-upload"></i> Upload files</button>
+                <button id="websitesBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-solid fa-link"></i> Websites</button>
+                <button id="driveBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-brands fa-google-drive"></i> Drive</button>
+                <button id="copiedTextBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-solid fa-clipboard"></i> Copied text</button>
+                <input type="file" id="multiPdfInput" multiple accept="application/pdf" style="display: none;">
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================================== -->
+<!-- 4. نافذة النص المنسوخ (Copied Text) -->
 <!-- ========================================== -->
 <div id="copiedTextModalBackdrop" class="modal-backdrop">
-    <div class="modal-body" style="position: relative; max-width: 600px; padding: 25px; background-color: #1e1e20; border-radius: 12px; text-align: left;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2 style="margin: 0; font-size: 18px; font-weight: normal; display: flex; align-items: center; gap: 15px;">
-                <i class="fa-solid fa-arrow-left" style="cursor: pointer;" id="backFromCopiedText"></i> Paste copied text
+    <div class="modal-body" style="width: 600px; max-width: 90vw; padding: 25px; background-color: #111214; border-radius: 12px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 500; display: flex; align-items: center; gap: 15px; color: white; text-transform: none;">
+                <i class="fa-solid fa-arrow-left" style="cursor: pointer; color: var(--text-muted);" id="backFromCopiedText"></i> Paste copied text
             </h2>
-            <!-- الـ X دابا داخل modal-body -->
-            <button id="closeCopiedTextModal" class="close-btn" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;"><i class="fa-solid fa-xmark"></i></button>
+            <button id="closeCopiedTextModal" class="close-btn" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px;"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px; padding-left: 35px;">Paste your copied text below to upload as a source</p>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">Paste your copied text below to upload as a source</p>
         
-        <textarea id="copiedTextInput" placeholder="Paste text here" style="width: 100%; height: 250px; background-color: #1a1a1c; border: 1px solid #5865F2; border-radius: 8px; color: white; padding: 15px; resize: none; font-family: inherit; margin-bottom: 15px; outline: none;"></textarea>
+        <textarea id="copiedTextInput" placeholder="Paste text here" style="width: 100%; height: 280px; background-color: #1e1f22; border: 1px solid #5865F2; border-radius: 12px; color: white; padding: 15px; resize: none; font-family: inherit; margin-bottom: 20px; outline: none; font-size: 14px;"></textarea>
         
         <div style="display: flex; justify-content: flex-end;">
-            <button id="insertCopiedTextBtn" class="primary" style="border-radius: 20px; padding: 8px 25px; background-color: #3b3f46; color: white; border: none; cursor: pointer;">Insert</button>
+            <button id="insertCopiedTextBtn" style="border-radius: 20px; padding: 10px 25px; background-color: #3b3f46; color: white; border: none; cursor: pointer; font-size: 14px; transition: 0.2s;">Insert</button>
         </div>
     </div>
 </div>
 
 <!-- ========================================== -->
-<!-- 2. نافذة: Website and YouTube URLs -->
+<!-- 5. نافذة الروابط (Websites) -->
 <!-- ========================================== -->
 <div id="websitesModalBackdrop" class="modal-backdrop">
-    <div class="modal-body" style="position: relative; max-width: 600px; padding: 25px; background-color: #1e1e20; border-radius: 12px; text-align: left;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h2 style="margin: 0; font-size: 18px; font-weight: normal; display: flex; align-items: center; gap: 15px;">
-                <i class="fa-solid fa-arrow-left" style="cursor: pointer;" id="backFromWebsites"></i> Website and YouTube URLs
+    <div class="modal-body" style="width: 600px; max-width: 90vw; padding: 25px; background-color: #111214; border-radius: 12px; text-align: left;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 500; display: flex; align-items: center; gap: 15px; color: white; text-transform: none;">
+                <i class="fa-solid fa-arrow-left" style="cursor: pointer; color: var(--text-muted);" id="backFromWebsites"></i> Website and YouTube URLs
             </h2>
-            <!-- الـ X دابا داخل modal-body -->
-            <button id="closeWebsitesModal" class="close-btn" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;"><i class="fa-solid fa-xmark"></i></button>
+            <button id="closeWebsitesModal" class="close-btn" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px;"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px; padding-left: 35px;">Paste in website and YouTube URLs below to upload as a source</p>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">Paste in website and YouTube URLs below to upload as a source</p>
         
-        <textarea id="websitesInput" placeholder="Paste any links" style="width: 100%; height: 180px; background-color: #1a1a1c; border: 1px solid #5865F2; border-radius: 8px; color: white; padding: 15px; resize: none; font-family: inherit; margin-bottom: 15px; outline: none;"></textarea>
+        <textarea id="websitesInput" placeholder="Paste any links" style="width: 100%; height: 180px; background-color: #1e1f22; border: 1px solid #5865F2; border-radius: 12px; color: white; padding: 15px; resize: none; font-family: inherit; margin-bottom: 20px; outline: none; font-size: 14px;"></textarea>
         
-        <ul style="color: var(--text-muted); font-size: 13px; line-height: 1.6; padding-left: 20px; margin-bottom: 20px;">
+        <ul style="color: var(--text-muted); font-size: 13px; line-height: 1.8; padding-left: 20px; margin-bottom: 25px;">
             <li>To add multiple URLs, separate with a space or new line.</li>
             <li>Only the visible text on the website will be imported at this time.</li>
             <li>Paid articles are not supported.</li>
             <li>Only the text transcript in YouTube will be imported at this time.</li>
             <li>Only public YouTube videos are supported.</li>
             <li>Recently uploaded videos may not be available to import.</li>
+         
         </ul>
 
         <div style="display: flex; justify-content: flex-end;">
-            <button id="insertWebsitesBtn" class="primary" style="border-radius: 20px; padding: 8px 25px; background-color: #3b3f46; color: white; border: none; cursor: pointer;">Insert</button>
-        </div>
-    </div>
-</div>
-</aside>
-
-<!-- 3. نافذة إضافة المصادر (Popup Modal) - هادي غتبان فوق كلشي -->
-<div id="addSourceModalBackdrop" class="modal-backdrop">
-    <div class="modal-body" style="text-align: center; max-width: 550px; border-radius: 12px; padding: 30px; background-color: #1e1e20;">
-        <button id="closeAddSourceModal" class="close-btn" style="position: absolute; top: 15px; right: 20px; background: none; border: none; color: white; cursor: pointer; font-size: 22px;">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-        
-        <h2 style="margin-bottom: 30px; font-weight: normal;">Create your graph from your sources</h2>
-        
-        <div style="border: 1px dashed var(--border); border-radius: 12px; padding: 40px 20px; background-color: #242528;">
-            <h3 style="margin-bottom: 10px; font-weight: normal;">or drop your files</h3>
-            <p style="color: var(--text-muted); margin-bottom: 25px; font-size: 14px;">pdf, images, docs, audio, <a href="#" style="color: white; text-decoration: underline;">and more</a></p>
-            
-            <div class="add-source-options" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
-                <button id="uploadFilesBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-solid fa-arrow-up-from-bracket"></i> Upload files</button>
-                <button id="websitesBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-solid fa-link"></i> Websites</button>
-                <button id="driveBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-brands fa-google-drive"></i> Drive</button>
-                <button id="copiedTextBtn" class="secondary-btn" style="border-radius: 20px; padding: 8px 16px; background-color: #2b2d31;"><i class="fa-solid fa-clipboard"></i> Copied text</button>
-                <input type="file" id="multiPdfInput" multiple accept="application/pdf" style="display: none;">
-            </div>
+            <button id="insertWebsitesBtn" style="border-radius: 20px; padding: 10px 25px; background-color: #3b3f46; color: white; border: none; cursor: pointer; font-size: 14px; transition: 0.2s;">Insert</button>
         </div>
     </div>
 </div>
