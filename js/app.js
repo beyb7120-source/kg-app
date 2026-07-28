@@ -1732,7 +1732,6 @@ async function showRequestAccessModal(graphId) {
     titleEl.textContent = `"${meta.title}"`;
     requestAccessModalBackdrop.classList.add("open");
 
-    // إيلا سبق وطلبنا (pending)، مانخليوش نعاودو نطلبو مرتين
     let existing = null;
     try {
         const res = await databases.listDocuments(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, [
@@ -1742,18 +1741,20 @@ async function showRequestAccessModal(graphId) {
         existing = res.documents.find(d => d.status === 'pending') || null;
     } catch (e) { console.error(e); }
 
+    // إيلا كان الطلب ديجا كاين، غانزيدو تصنت (Listen) ليه
     if (existing) {
         statusEl.style.display = "block";
         statusEl.style.color = "var(--text-muted)";
         statusEl.textContent = "Ta demande est déjà en attente d'approbation du propriétaire.";
         btn.style.display = "none";
+        listenToRequestStatus(existing.$id, statusEl); // <--- السطر الجديد
         return;
     }
 
     btn.onclick = async () => {
         btn.disabled = true;
         try {
-            await databases.createDocument(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, ID.unique(), {
+            const newReq = await databases.createDocument(DATABASE_ID, ACCESS_REQUESTS_COLLECTION_ID, ID.unique(), {
                 graphId,
                 ownerId: meta.ownerId,
                 requesterId: currentUser.$id,
@@ -1761,15 +1762,15 @@ async function showRequestAccessModal(graphId) {
                 requesterName: currentUser.name || currentUser.email,
                 status: 'pending',
             }, [
-                // التعديل لي خصك دير هو هذا:
-                Permission.read(Role.users()),    // أي واحد مكونيكطي يقدر يقرا (باش مول الغراف يشوف الطلب)
-                Permission.update(Role.users()),  // أي واحد مكونيكطي يقدر يبدل (باش مول الغراف يقدر يدير accepted)
-                Permission.delete(Role.user(currentUser.$id)) // مول الطلب هو الوحيد لي يقدر يمسحو
+                Permission.read(Role.users()),
+                Permission.update(Role.users()),
+                Permission.delete(Role.user(currentUser.$id))
             ]);
             statusEl.style.display = "block";
             statusEl.style.color = "#8fbf7f";
             statusEl.textContent = "Demande envoyée ! Tu recevras un email si le propriétaire l'accepte.";
             btn.style.display = "none";
+            listenToRequestStatus(newReq.$id, statusEl); // <--- السطر الجديد
         } catch (err) {
             statusEl.style.display = "block";
             statusEl.style.color = "#e06b6b";
@@ -1777,6 +1778,22 @@ async function showRequestAccessModal(graphId) {
             btn.disabled = false;
         }
     };
+
+    // الدالة الجديدة اللي كتجيب التحديث فالبلاصة للشخص اللي طالب الإذن
+    function listenToRequestStatus(reqId, statusElement) {
+        client.subscribe(`databases.${DATABASE_ID}.collections.${ACCESS_REQUESTS_COLLECTION_ID}.documents.${reqId}`, (response) => {
+            if (response.events.some(e => e.endsWith('.update'))) {
+                const updatedReq = response.payload;
+                if (updatedReq.status === 'accepted') {
+                    statusElement.style.color = "#8fbf7f";
+                    statusElement.textContent = "Demande acceptée ! Vérifie tes emails (ou SPAMS) pour confirmer, puis recharge la page.";
+                } else if (updatedReq.status === 'rejected') {
+                    statusElement.style.color = "#e06b6b";
+                    statusElement.textContent = "Demande refusée par le propriétaire.";
+                }
+            }
+        });
+    }
 }
 
 const requestAccessModalClose = document.getElementById("requestAccessModalClose");
