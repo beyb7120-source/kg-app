@@ -1,15 +1,41 @@
 :root {
-  --bg-primary: #0f2a44;
-  --bg-panel: #123252;
-  --bg-panel-raised: #163a5c;
-  --grid-line: rgba(140, 190, 230, 0.07);
-  --accent: #e8934a;
-  --accent-cyan: #6fc3df;
-  --text-primary: #eaf1f8;
-  --text-muted: #93a9c2;
-  --border: #2a4a6b;
-  --font-mono: "IBM Plex Mono", monospace;
-  --font-sans: "IBM Plex Sans", sans-serif;
+  /* ============================================================
+     Constella — design tokens (Liquid Glass + Chromatography).
+     كنبقاو حافظين على نفس أسماء المتغيرات القديمة (--bg-primary,
+     --accent, --border...) باش JS/CSS القدام يخدموا بلا حتى تبديل —
+     غير القيم اللي تبدلات لدارك ديزاين جديد.
+     ============================================================ */
+  --surface: #131314;
+  --primary: #d8b9ff;
+  --secondary: #43ecdb;
+  --tertiary: #ffba20;
+  --danger: #ffb4ab;
+  --on-surface: #e5e2e3;
+  --on-surface-variant: #cec2d7;
+
+  /* --- alias القدام (كايستعملهم كامل باقي الملف والـ HTML) --- */
+  --bg-primary: var(--surface);
+  --bg-panel: rgba(255, 255, 255, 0.05);
+  --bg-panel-raised: rgba(255, 255, 255, 0.08);
+  --grid-line: rgba(255, 255, 255, 0.05);
+  --accent: var(--primary);
+  --accent-cyan: var(--secondary);
+  --text-primary: var(--on-surface);
+  --text-muted: var(--on-surface-variant);
+  --border: rgba(255, 255, 255, 0.12);
+  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Geist", "Inter", sans-serif;
+
+  /* --- tokens ديال الزجاج (glass) --- */
+  --glass-blur: 20px;
+  --glass-border-top: rgba(255, 255, 255, 0.2);
+  --glass-border-bottom: rgba(255, 255, 255, 0.1);
+  --radius-card: 24px;
+  --radius-pill: 9999px;
+  --glow-primary: 0 0 20px rgba(216, 185, 255, 0.4);
+  --glow-secondary: 0 0 20px rgba(67, 236, 219, 0.35);
+
   /* متغيرات جديدة باش نتحكمو فالعرض ديال الـ Panels بالجران */
   --left-panel-width: 300px;
   --right-panel-width: 280px;
@@ -19,10 +45,7 @@
 
 body {
   margin: 0;
-  background:
-    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 28px 28px,
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 28px 28px,
-    var(--bg-primary);
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
   height: 100vh;
@@ -30,10 +53,11 @@ body {
   flex-direction: column;
   overflow: hidden; /* باش نمنعو السكرول فالصفحة كاملة ونخليوه غير وسط الـ Panels */
   padding: 0;
+  position: relative;
 }
 
-h1, h2 { font-family: var(--font-mono); margin: 0; letter-spacing: 0.02em; }
-h2 { font-size: 12px; text-transform: uppercase; color: var(--accent-cyan); margin-bottom: 10px; }
+h1, h2 { font-family: var(--font-display); margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-cyan); margin-bottom: 10px; }
 
 /* ---------- topbar ---------- */
 .topbar {
@@ -620,20 +644,33 @@ body.resizing { cursor: col-resize; user-select: none; }
    d'autre à changer ailleurs : il suffit d'overrider les vars ici.
    ============================================================ */
 body.theme-light {
-  --bg-primary: #eef3f8;
-  --bg-panel: #ffffff;
-  --bg-panel-raised: #f5f8fb;
+  --surface: #f8f9fa;
+  --primary: #6200bc;
+  --secondary: #00534c;
+  --tertiary: #8a5c00;
+  --danger: #ba1a1a;
+  --on-surface: #1c1b1c;
+  --on-surface-variant: #4a4550;
+
+  --bg-primary: var(--surface);
+  --bg-panel: rgba(0, 0, 0, 0.03);
+  --bg-panel-raised: rgba(255, 255, 255, 0.7);
   --grid-line: rgba(20, 49, 79, 0.05);
-  --text-primary: #14314f;
-  --text-muted: #5c7290;
-  --border: #d7e1ec;
+  --accent: var(--primary);
+  --accent-cyan: var(--secondary);
+  --text-primary: var(--on-surface);
+  --text-muted: var(--on-surface-variant);
+  --border: rgba(0, 0, 0, 0.1);
+  --glass-border-top: rgba(255, 255, 255, 0.6);
+  --glass-border-bottom: rgba(0, 0, 0, 0.06);
 }
 body.theme-light .graph-toolbar .icon-btn,
 body.theme-light .legend-overlay,
-body.theme-light .confidence-control { background: rgba(255, 255, 255, 0.9); }
-body.theme-light .topbar { background: rgba(238, 243, 248, 0.9); }
+body.theme-light .confidence-control { background: rgba(255, 255, 255, 0.75); }
+body.theme-light .topbar { background: rgba(248, 249, 250, 0.75); }
 body.theme-light .run-btn,
 body.theme-light .chat-input-row button { color: #ffffff; }
+body.theme-light #chromaBackgroundWrap { opacity: 0.18; mix-blend-mode: multiply; }
 
 /* ============================================================
    Toast notifications — feedback visible pour toute action qui
@@ -924,3 +961,212 @@ body.theme-light .chat-input-row button { color: #ffffff; }
 }
 .dropdown-content button:hover { background-color: #3f4147; }
 .dropdown-content button:nth-child(2) { color: #e06b6b; }
+/* ============================================================
+   ============================================================
+   CONSTELLA — GLASSMORPHISM LAYER (session 3 — restyle)
+   طبقة زايدة فوق كلشي لي فوق: مافيهاش أي تبديل فـ IDs/classes لي
+   كيخدم عليهم app.js — غير override ديال اللوك (زجاج، pill,
+   specular border, glow, blur). الكاسكاد (نفس specificity، جاية
+   من بعد) كافي باش تربح على القيم القديمة.
+   ============================================================
+   ============================================================ */
+
+@font-face { font-display: swap; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.22); }
+
+/* ---------- brand / topbar ---------- */
+.topbar {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--glass-border-bottom);
+  border-top: 1px solid var(--glass-border-top);
+  z-index: 10;
+}
+.brand-mark {
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(216, 185, 255, 0.25), rgba(67, 236, 219, 0.15));
+  border: 1px solid var(--glass-border-top);
+  color: var(--primary);
+}
+.app-name { font-family: var(--font-display); font-weight: 600; }
+.graph-title { font-family: var(--font-display); }
+.graph-title.editing { background: var(--bg-panel-raised); border-radius: 10px; }
+
+/* ---------- glass panels / cards ---------- */
+.panel, .graph-stage,
+.modal, .node-popup,
+.stat-box, .toast, .card-dropdown, .icon-picker, .dropdown-content {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-top: 1px solid var(--glass-border-top);
+  border-left: 1px solid var(--glass-border-top);
+  border-right: 1px solid var(--glass-border-bottom);
+  border-bottom: 1px solid var(--glass-border-bottom);
+}
+.panel, .graph-stage { border-radius: var(--radius-card); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25); }
+.layout { gap: 12px; }
+.modal, .node-popup { border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.modal-backdrop { backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px); background: rgba(5, 5, 8, 0.5); }
+.node-popup-backdrop { backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.modal-header, .modal-header h2 { font-family: var(--font-display); }
+.modal-header h2 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; text-transform: none; color: var(--text-primary); }
+
+/* ---------- buttons ---------- */
+.run-btn {
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, var(--primary), #ae72ff);
+  color: var(--on-primary, #290055);
+  box-shadow: var(--glow-primary);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  transition: box-shadow 0.25s ease, transform 0.15s ease;
+}
+.run-btn:hover:not(:disabled) { filter: none; box-shadow: 0 0 30px rgba(216, 185, 255, 0.65); transform: translateY(-1px); }
+
+.icon-btn {
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--glass-border-bottom);
+}
+.icon-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: var(--secondary); box-shadow: var(--glow-secondary); }
+
+.secondary-btn {
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.04);
+}
+.secondary-btn:hover { background: rgba(255, 255, 255, 0.08); }
+
+#addSourceBtn, .run-btn, #runBtn { border-radius: var(--radius-pill) !important; }
+
+.detail-actions button, .node-popup .detail-actions button, .edit-actions-row button {
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.04);
+}
+.edit-actions-row button.primary {
+  background: linear-gradient(135deg, var(--primary), #ae72ff);
+  color: var(--on-primary, #290055);
+  border-color: transparent;
+}
+.edit-actions-row button.danger,
+.detail-actions button.danger-action { color: var(--danger); border-color: rgba(255, 180, 171, 0.4); background: rgba(255, 180, 171, 0.08); }
+
+/* ---------- inputs / fields ---------- */
+.key-field input,
+#pasteText, .edit-field, .add-relation-form select, .add-relation-form input,
+.search-input, #shareEmail, #shareRole {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border-bottom);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+}
+.key-field input:focus, .search-input:focus, .edit-field:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(67, 236, 219, 0.15); }
+
+.chat-input-row {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--glass-border-bottom);
+  backdrop-filter: blur(var(--glass-blur));
+}
+.chat-input-row:focus-within { border-color: var(--secondary); box-shadow: var(--glow-secondary); }
+.chat-input-row button {
+  background: var(--secondary);
+  color: #003732;
+  box-shadow: 0 0 12px rgba(67, 236, 219, 0.5);
+}
+
+/* ---------- range slider (Confiance min.) ---------- */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  margin-top: -6px;
+  background: var(--secondary);
+  box-shadow: 0 0 10px var(--secondary);
+  cursor: pointer;
+  border: none;
+}
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); }
+input[type="range"]::-moz-range-thumb {
+  height: 16px; width: 16px; border-radius: 50%;
+  background: var(--secondary); box-shadow: 0 0 10px var(--secondary); border: none; cursor: pointer;
+}
+.confidence-control {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--radius-pill);
+  border-color: var(--glass-border-bottom);
+}
+
+/* ---------- floating overlays over the graph canvas ---------- */
+.graph-toolbar { border-radius: var(--radius-pill); }
+.graph-toolbar .icon-btn { background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(var(--glass-blur)); }
+.legend-overlay {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(var(--glass-blur));
+  border-radius: 16px;
+  border-color: var(--glass-border-bottom);
+}
+.legend-overlay li.active { background: rgba(216, 185, 255, 0.18); color: var(--primary); }
+.legend .swatch, .legend-overlay .swatch { box-shadow: 0 0 6px currentColor; }
+
+/* ---------- chips / pills ---------- */
+.chip {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-pill);
+  border-color: var(--glass-border-bottom);
+}
+.chip:hover { border-color: var(--secondary); color: var(--secondary); box-shadow: var(--glow-secondary); }
+.chat-mode-reset { border-radius: var(--radius-pill); }
+
+/* ---------- chat bubbles ---------- */
+.chat-msg {
+  border-radius: 16px;
+  border-left: none !important;
+  backdrop-filter: blur(12px);
+}
+.chat-msg.user { background: rgba(67, 236, 219, 0.12); border: 1px solid rgba(67, 236, 219, 0.25); border-radius: 16px 16px 4px 16px; }
+.chat-msg.assistant { background: rgba(216, 185, 255, 0.1); border: 1px solid rgba(216, 185, 255, 0.2); border-radius: 16px 16px 16px 4px; }
+.chat-msg.error { background: rgba(255, 180, 171, 0.1); border: 1px solid rgba(255, 180, 171, 0.3); color: var(--danger); }
+
+/* ---------- toasts ---------- */
+.toast { border-radius: 14px; border-left: 3px solid var(--secondary); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4); }
+.toast.error { border-left-color: var(--danger); }
+.toast.success { border-left-color: #7fe0a0; }
+
+/* ---------- resizer handle ---------- */
+.resizer::after { background: rgba(255, 255, 255, 0.15); }
+.resizer:hover::after, body.resizing .resizer::after { background: var(--secondary); box-shadow: var(--glow-secondary); }
+
+/* ---------- source result / detail card accents ---------- */
+.detail-card h3, .stat-box .stat-value { color: var(--primary); font-family: var(--font-display); }
+.source-result mark { background: rgba(216, 185, 255, 0.35); border-radius: 4px; }
+.source-link, .detail-card .quote { color: var(--secondary); }
+.detail-card .confidence-fill { background: var(--secondary); box-shadow: 0 0 6px var(--secondary); }
+.learning-path-list li::before { color: var(--primary); }
+.learning-path-list li:hover { color: var(--secondary); }
+
+/* ---------- background chroma canvas placement ---------- */
+#chromaBackgroundWrap { transition: opacity 0.4s ease; }
+
+@media (max-width: 1024px) {
+  .panel, .graph-stage { border-radius: 20px; }
+}

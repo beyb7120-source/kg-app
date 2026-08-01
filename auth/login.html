@@ -6,7 +6,8 @@
   <title>Connexion — Constella</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   
   <!-- باش تخدم الأيقونة ديال جوجل -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -15,6 +16,12 @@
   <link rel="stylesheet" href="../css/login.css" />
 </head>
 <body class="login-body">
+
+  <!-- خلفية Constella المتحركة (chromatography bubbles) -->
+  <script type="module">
+    import { initChromaBackground } from "../js/chromaBackground.js";
+    initChromaBackground({ opacity: 0.6 });
+  </script>
 
   <main class="login-wrapper">
     <div class="panel login-panel">
@@ -34,6 +41,10 @@
           Continuer avec Google
         </button>
       </div>
+
+      <p class="login-terms">
+        En continuant, vous acceptez nos <a href="#">Conditions</a> et notre <a href="#">Politique de confidentialité</a>.
+      </p>
 
     </div>
   </main>
