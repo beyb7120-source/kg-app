@@ -735,18 +735,8 @@ body.theme-light #chromaBackgroundWrap { opacity: 0.18; mix-blend-mode: multiply
    Merge toggle (ajouter une source à un graphe existant) +
    remember-key checkbox — petites options à cocher, style unifié.
    ============================================================ */
-.inline-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  margin: 8px 0 14px;
-  cursor: pointer;
-}
-.inline-checkbox input { accent-color: var(--accent-cyan); cursor: pointer; }
-.key-field .inline-checkbox { margin: 6px 0 0; justify-content: flex-end; }
+
+.key-field { margin: 6px 0 0; justify-content: flex-end; }
 
 /* ============================================================
    Detail card — édition inline (label/définition d'un nœud,

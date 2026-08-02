@@ -181,7 +181,6 @@ const mergeToggleCheckbox = document.getElementById("mergeToggleCheckbox");
 const jsonImportInput = document.getElementById("jsonImportInput");
 const importJsonBtn = document.getElementById("importJsonBtn");
 
-const rememberKeyCheckbox = document.getElementById("rememberKeyCheckbox");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 
 const statsModalBackdrop = document.getElementById("statsModalBackdrop");
