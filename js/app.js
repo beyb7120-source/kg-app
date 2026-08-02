@@ -74,6 +74,7 @@ let sourcesArray = [];
 // DOM References
 // ============================================================
 const graphTitleEl = document.getElementById("graphTitle");
+const apiKeyInput = document.getElementById("apiKey");
 const runBtn = document.getElementById("runBtn");
 const graphContainer = document.getElementById("graphContainer");
 const emptyState = document.getElementById("emptyState");
@@ -180,6 +181,10 @@ window.addEventListener("beforeunload", (e) => {
 initThemeToggle(themeToggleBtn);
 /* global pdfjsLib */
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+
+apiKeyInput.addEventListener("input", () => {
+    runtimeAuth.apiKey = apiKeyInput.value.trim();
+});
 
 // ============================================================
 // Multi-Source UI Logic
@@ -426,7 +431,7 @@ closeSourceResultBtn.addEventListener("click", () => {
 account.get()
     .then(async (response) => {
         currentUser = response;
-        document.body.style.display = 'block'; 
+        document.body.style.display = 'flex';
         document.getElementById('userNameDisplay').textContent = response.name || response.email || 'Utilisateur';
 
         if (teamIdParam && membershipIdParam && userIdParam && secretParam) {

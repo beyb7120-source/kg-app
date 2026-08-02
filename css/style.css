@@ -48,10 +48,10 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* باش نمنعو السكرول فالصفحة كاملة ونخليوه غير وسط الـ Panels */
+  overflow: hidden;
   padding: 0;
   position: relative;
 }
@@ -110,6 +110,15 @@ h2 { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; tex
   overflow: visible;
 }
 
+.key-field { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.key-field label { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+.key-field input {
+  width: 220px; padding: 8px 10px; background: var(--bg-panel);
+  border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 12px;
+}
+.key-hint { margin: 4px 0 0; font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); }
+
 .user-info { display: flex; flex-direction: column; align-items: flex-end; }
 #userNameDisplay { font-size: 12px; color: var(--text-muted); font-family: var(--font-mono); }
 
@@ -137,8 +146,8 @@ h2 { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; tex
 .layout {
   display: grid;
   grid-template-columns: var(--left-panel-width) 12px 1fr 12px var(--right-panel-width);
-  flex: 1; /* كياخد المساحة اللي بقات تحت الـ Header */
-  padding: 12px; /* الفراغ اللي بين الـ Panels وجناب الشاشة */
+  flex: 1 1 auto;
+  padding: 12px;
   gap: 0;
   min-height: 0;
 }
@@ -151,13 +160,12 @@ h2 { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; tex
   display: flex;
   flex-direction: column;
   height: 100%;
-  min-height: 0; /* باش المحتوى لي لداخل يدير السكرول ومايفرقعش الـ container */
-  min-width: 0;  /* الطول/العرض ديال الثلاثي (panel-left/graph-stage/panel-right) ثابت
-                    على حساب حجم الشاشة (grid + height:100%) — min-width:0 كيضمن
-                    أن أي محتوى طويل بلا فراغ (نص، تسمية عقدة...) مايكسرش هاد
-                    الحجم الثابت، هو لي كيتقص/يدير سكرول بدل مايكبر container. */
+  align-self: stretch;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
+
 .panel {
   padding: 18px;
   overflow-y: auto;
@@ -724,6 +732,23 @@ body.theme-light #chromaBackgroundWrap { opacity: 0.18; mix-blend-mode: multiply
 .confidence-control .confidence-value { color: var(--text-primary); min-width: 30px; text-align: right; }
 
 /* ============================================================
+   Merge toggle (ajouter une source à un graphe existant) +
+   remember-key checkbox — petites options à cocher, style unifié.
+   ============================================================ */
+.inline-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin: 8px 0 14px;
+  cursor: pointer;
+}
+.inline-checkbox input { accent-color: var(--accent-cyan); cursor: pointer; }
+.key-field .inline-checkbox { margin: 6px 0 0; justify-content: flex-end; }
+
+/* ============================================================
    Detail card — édition inline (label/définition d'un nœud,
    type/suppression d'une relation) + formulaire "ajouter une
    relation". Réutilise le style des .detail-actions button.
@@ -1033,6 +1058,7 @@ body.theme-light #chromaBackgroundWrap { opacity: 0.18; mix-blend-mode: multiply
 .detail-actions button.danger-action { color: var(--danger); border-color: rgba(255, 180, 171, 0.4); background: rgba(255, 180, 171, 0.08); }
 
 /* ---------- inputs / fields ---------- */
+.key-field input,
 #pasteText, .edit-field, .add-relation-form select, .add-relation-form input,
 .search-input, #shareEmail, #shareRole {
   background: rgba(255, 255, 255, 0.04);
@@ -1040,7 +1066,7 @@ body.theme-light #chromaBackgroundWrap { opacity: 0.18; mix-blend-mode: multiply
   border-radius: 14px;
   backdrop-filter: blur(8px);
 }
-.search-input:focus, .edit-field:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(67, 236, 219, 0.15); }
+.key-field input:focus, .search-input:focus, .edit-field:focus { border-color: var(--secondary); box-shadow: 0 0 0 3px rgba(67, 236, 219, 0.15); }
 
 .chat-input-row {
   background: rgba(255, 255, 255, 0.05);
@@ -1359,7 +1385,7 @@ input[type="range"]::-moz-range-thumb {
    ============================================================ */
 .share-row { display: flex; gap: 8px; margin-bottom: 14px; }
 .share-row input { flex: 1; min-width: 0; }
-.share-row select { width: 150px; flex-shrink: 0; cursor: pointer; }
+.share-row select { width: 130px; flex-shrink: 0; cursor: pointer; }
 
 .pill-btn-ghost {
   background: rgba(255, 255, 255, 0.08);
