@@ -50,12 +50,10 @@ function updateAccessButtonsVisibility() {
     const shareBtn = document.getElementById('openShareModalBtn');
     const manageBtn = document.getElementById('openManageModalBtn');
     const leaveBtn = document.getElementById('leaveGraphBtn');
-    const copyLinkBtn = document.getElementById('copyLinkBtn');
 
     if (shareBtn) shareBtn.style.display = isOwner ? 'block' : 'none';
     if (manageBtn) manageBtn.style.display = isOwner ? 'block' : 'none';
     if (leaveBtn) leaveBtn.style.display = !isOwner ? 'block' : 'none';
-    if (copyLinkBtn) copyLinkBtn.style.display = currentDbId ? 'inline-flex' : 'none';
 }
 
 const teamIdParam = urlParams.get('teamId');
@@ -159,7 +157,6 @@ const pathModalClose = document.getElementById("pathModalClose");
 const shareModalBackdrop = document.getElementById("shareModalBackdrop");
 const openShareModalBtn = document.getElementById("openShareModalBtn");
 const shareModalClose = document.getElementById("shareModalClose");
-const copyLinkBtn = document.getElementById("copyLinkBtn");
 const modalCopyLinkBtn = document.getElementById("modalCopyLinkBtn"); // زر الكوبي الجديد المدموج داخل مودال "Partager"
 const shareLinkText = document.getElementById("shareLinkText"); // النص اللي كيبين الرابط داخل نفس المودال
 const confirmShareBtn = document.getElementById("confirmShareBtn");
@@ -1059,7 +1056,6 @@ async function copyGraphLink() {
     try { await navigator.clipboard.writeText(link); showToast("Lien copié.", "success"); }
     catch { prompt("Copie ce lien :", link); }
 }
-if (copyLinkBtn) copyLinkBtn.addEventListener("click", copyGraphLink);
 if (modalCopyLinkBtn) modalCopyLinkBtn.addEventListener("click", copyGraphLink);
 
 async function ensureShareTeam(graphId) {
