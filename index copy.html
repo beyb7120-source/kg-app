@@ -6,18 +6,14 @@
 <title>Constella</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
 <!-- كنخدمو نسخة وحدة غير ديال pdf.js، ومتفقة مع الـ worker (3.4.120) -->
 <!-- نسخة 4.0.379 ماكايناش أصلا فـ cdnjs (404) — هي لي كانت
      سبب فـ "pdfjsLib is not defined" و"Setting up fake worker failed"،
      حيت السكريبت ماكانش كيتحمل خالص. -->
-<script src="https://apis.google.com/js/api.js"></script>
-<script async defer src="https://apis.google.com/js/api.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script> <!-- <--- زيد هادي -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.1"></script>
@@ -25,12 +21,6 @@
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body style="display: none;"> <!-- درنا display: none باش مايبان التطبيق حتى نتأكدو واش مكونيكطي -->
-
-<!-- خلفية Constella المتحركة (chromatography bubbles) — module جديد، بلا علاقة بالمنطق ديال التطبيق -->
-<script type="module">
-  import { initChromaBackground } from "./js/chromaBackground.js";
-  initChromaBackground({ opacity: 0.45 });
-</script>
 
 <header class="topbar">
   <div class="topbar-side topbar-left">
@@ -46,6 +36,15 @@
   </div>
 
   <div class="topbar-side topbar-right">
+    <div class="key-field">
+      <label for="apiKey">Clé API Mistral</label>
+      <input id="apiKey" type="password" placeholder="colle ta clé ici" autocomplete="off" />
+      <label class="inline-checkbox">
+        <input type="checkbox" id="rememberKeyCheckbox" />
+        Se souvenir (cet onglet seulement)
+      </label>
+    </div>
+
     <div class="user-info">
       <span id="userNameDisplay">Loading...</span>
     </div>
@@ -56,15 +55,10 @@
 </button> -->
 
 <!-- أزرار المشاركة والإدارة (غيبانو ويتخباو بالـ JS على حساب واش نتا Owner أو Viewer) -->
-<div id="graphActions" style="display: flex; align-items: center; margin-right: 15px; gap: 10px;">
-    <!-- زر عمومي مصغّر: كلشي (خصوصا الضيوف اللي مقدروش يحلو مودال Partager) يقدر يكوبي الرابط ديركت -->
-    <button id="copyLinkBtn" class="icon-btn" title="Copier le lien du graphe" aria-label="Copier le lien du graphe" style="display:none;">
-        <i class="fa-solid fa-link"></i>
-    </button>
+<div id="graphActions" style="display: flex; align-items: center; margin-right: 15px;">
     <!-- أزرار صاحب المبيان -->
-    <button id="openManageModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px; background: var(--bg-panel); position: relative;">
+    <button id="openManageModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; margin-right: 10px; border-radius: 24px; background: var(--bg-panel);">
         <i class="fa-solid fa-users"></i> Accès
-        <span id="pendingRequestsBadge" style="display:none; position:absolute; top:-6px; right:-6px; background:#e06b6b; color:#fff; font-size:10px; min-width:16px; height:16px; border-radius:8px; align-items:center; justify-content:center; padding:0 4px;">0</span>
     </button>
     <button id="openShareModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px;">
         <i class="fa-solid fa-share-nodes"></i> Partager
@@ -87,120 +81,37 @@
 
 <main class="layout">
 
-  <aside class="panel panel-left" style="display: flex; flex-direction: column;">
-    <!-- 1. مدير المصادر (مخفي ملي كنكليكيو على View Source) -->
-    <section class="block" id="sourcesManager" style="display: flex; flex-direction: column; flex: 1;">
-        <div class="sources-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="margin: 0; color: var(--text-muted);">SOURCES</h2>
-            <input type="file" id="jsonImportInput" accept="application/json" hidden />
-            <button type="button" id="importJsonBtn" class="secondary-btn" style="padding: 4px 8px; font-size: 11px; border-radius: 4px; width: auto;">
-                <i class="fa-solid fa-code"></i> JSON
-            </button>
-        </div>
-
-        <button id="addSourceBtn" style="width: 100%; border-radius: 20px; padding: 10px; margin-bottom: 20px; font-size: 13px; background-color: #3b3f46; color: white; border: 1px solid #4f545c; cursor: pointer; transition: 0.2s;">
-            <i class="fa-solid fa-plus"></i> Add sources
-        </button>
-
-        <div class="sources-list-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 0 5px;">
-            <span style="color: var(--text-muted); cursor: pointer;"><i class="fa-solid fa-bars-staggered"></i></span>
-            <label style="cursor: pointer; display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 13px;">
-                Select all <input type="checkbox" id="selectAllSources" checked class="source-checkbox">
-            </label>
-        </div>
-
-        <ul id="sourcesList" class="sources-list"></ul>
-        
-        <button id="runBtn" class="run-btn">Lancer l'extraction</button>
+  <aside class="panel panel-left">
+    <section class="block">
+      <h2>01 — Source</h2>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="pdfInput" accept="application/pdf" hidden />
+        <p><strong>Dépose un PDF</strong> ou clique pour choisir un fichier</p>
+        <p class="hint">PDF numérique uniquement (pas de scan/image) — voir README</p>
+      </div>
+      <p class="or-divider">— ou —</p>
+      <textarea id="pasteText" placeholder="colle le texte du cours ici..."></textarea>
+      <p class="or-divider">— ou —</p>
+      <input type="file" id="jsonImportInput" accept="application/json" hidden />
+      <button type="button" id="importJsonBtn" class="secondary-btn" aria-label="Importer un graphe déjà exporté en JSON">
+        <i class="fa-solid fa-file-import"></i> Importer un graphe (.json)
+      </button>
     </section>
 
-    <!-- 2. عرض النص (View in Sources) - مخفي أوتوماتيكيا -->
-    <section class="block source-result-block" id="sourceResultBlock" style="display: none; height: 100%; flex-direction: column;">
-        <div class="source-result-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-            <h2 style="margin: 0;">View in sources</h2>
-            <button id="closeSourceResultBtn" class="close-btn" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        <div id="sourceResult" class="source-result" style="overflow-y: auto; flex-grow: 1;"></div>
+    <label class="inline-checkbox" id="mergeToggleWrap" style="display:none">
+      <input type="checkbox" id="mergeToggleCheckbox" />
+      Ajouter cette source au graphe actuel (au lieu de le remplacer)
+    </label>
+
+    <button id="runBtn" class="run-btn">Lancer l'extraction</button>
+
+    <section class="block source-result-block" id="sourceResultBlock">
+      <h2>02 — Source</h2>
+      <div id="sourceResult" class="source-result">
+        <p class="empty-hint">Clique sur « voir dans le texte source » pour afficher le passage ici.</p>
+      </div>
     </section>
-</aside>
-
-<!-- ========================================== -->
-<!-- 3. نافذة إضافة المصادر (القائمة الرئيسية) -->
-<!-- ========================================== -->
-<div id="addSourceModalBackdrop" class="modal-backdrop">
-    <div class="modal modal-card">
-        <button id="closeAddSourceModal" class="modal-close modal-card-close" aria-label="Fermer"><i class="fa-solid fa-xmark"></i></button>
-
-        <div class="modal-card-header">
-            <i class="fa-solid fa-circle-plus"></i>
-            <h2>Ajouter une source</h2>
-        </div>
-
-        <div class="source-dropzone-new">
-            <i class="fa-solid fa-cloud-arrow-up"></i>
-            <p>Glissez-déposez vos fichiers ici</p>
-            <span class="mono-hint">PDF, DOCX, TXT (Max 50MB)</span>
-        </div>
-
-        <div class="add-source-options pill-btn-group">
-            <button id="uploadFilesBtn" class="pill-btn"><i class="fa-solid fa-upload"></i> Télécharger</button>
-            <button id="websitesBtn" class="pill-btn"><i class="fa-solid fa-globe"></i> Sites web</button>
-            <button id="driveLinkBtn" class="pill-btn"><i class="fa-brands fa-google-drive"></i> Google Drive</button>
-            <button id="copiedTextBtn" class="pill-btn"><i class="fa-regular fa-copy"></i> Texte copié</button>
-            <input type="file" id="multiPdfInput" multiple accept="application/pdf" style="display: none;">
-        </div>
-    </div>
-</div>
-
-
-<!-- ========================================== -->
-<!-- 4. نافذة النص المنسوخ (Copied Text) -->
-<!-- ========================================== -->
-<div id="copiedTextModalBackdrop" class="modal-backdrop">
-    <div class="modal modal-card modal-card-left">
-        <div class="modal-card-header modal-card-header-row">
-            <h2><i class="fa-solid fa-arrow-left modal-back-icon" id="backFromCopiedText"></i> Coller le texte copié</h2>
-            <button id="closeCopiedTextModal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <p class="modal-card-hint">Colle le texte copié ci-dessous pour l'ajouter comme source.</p>
-
-        <textarea id="copiedTextInput" class="modal-textarea" placeholder="Coller le texte ici"></textarea>
-
-        <div class="modal-card-actions">
-            <button id="insertCopiedTextBtn" class="pill-btn pill-btn-primary">Insérer</button>
-        </div>
-    </div>
-</div>
-
-<!-- ========================================== -->
-<!-- 5. نافذة الروابط (Websites) -->
-<!-- ========================================== -->
-<div id="websitesModalBackdrop" class="modal-backdrop">
-    <div class="modal modal-card modal-card-left">
-        <div class="modal-card-header modal-card-header-row">
-            <h2><i class="fa-solid fa-arrow-left modal-back-icon" id="backFromWebsites"></i> URLs de sites web et YouTube</h2>
-            <button id="closeWebsitesModal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <p class="modal-card-hint">Colle des liens de sites web ou YouTube ci-dessous pour les ajouter comme sources.</p>
-
-        <textarea id="websitesInput" class="modal-textarea modal-textarea-sm" placeholder="Coller n'importe quel lien"></textarea>
-
-        <ul class="modal-card-list">
-            <li>Pour ajouter plusieurs URLs, sépare-les par un espace ou une nouvelle ligne.</li>
-            <li>Seul le texte visible du site sera importé pour l'instant.</li>
-            <li>Les articles payants ne sont pas supportés.</li>
-            <li>Seule la transcription texte de YouTube sera importée pour l'instant.</li>
-            <li>Seules les vidéos YouTube publiques sont supportées.</li>
-            <li>Les vidéos récemment mises en ligne peuvent ne pas être disponibles.</li>
-        </ul>
-
-        <div class="modal-card-actions">
-            <button id="insertWebsitesBtn" class="pill-btn pill-btn-primary">Insérer</button>
-        </div>
-    </div>
-</div>
+  </aside>
 
   <div class="resizer" id="resizerLeft" title="Glisser pour redimensionner"></div>
 
@@ -262,7 +173,7 @@
 <div class="modal-backdrop" id="pathModalBackdrop">
   <div class="modal">
     <div class="modal-header">
-      <h2><i class="fa-solid fa-route" style="color:var(--primary); margin-right:8px;"></i>Parcours d'apprentissage conseillé</h2>
+      <h2>Parcours d'apprentissage conseillé</h2>
       <div class="modal-header-actions">
         <button id="arrangeGraphBtn" class="icon-btn" title="Organiser le graphe (vue parcours)" aria-label="Organiser le graphe en vue parcours" disabled>
           <i class="fa-solid fa-diagram-project"></i>
@@ -293,7 +204,7 @@
 <div class="modal-backdrop" id="addRelationModalBackdrop">
   <div class="modal">
     <div class="modal-header">
-      <h2><i class="fa-solid fa-link" style="color:var(--primary); margin-right:8px;"></i>Ajouter une relation manuelle</h2>
+      <h2>Ajouter une relation manuelle</h2>
       <button class="modal-close" id="addRelationModalClose" aria-label="Fermer">✕</button>
     </div>
     <div class="modal-body">
@@ -324,33 +235,29 @@
 
 <!-- ---------- Share Modal ---------- -->
 <div class="modal-backdrop" id="shareModalBackdrop">
-  <div class="modal modal-card" style="width: min(500px, 90vw);">
+  <div class="modal" style="width: min(400px, 90vw);">
     <div class="modal-header">
-      <h2><i class="fa-solid fa-share-nodes" style="color:var(--secondary); margin-right:8px;"></i>Partager ce graphe</h2>
+      <h2>Partager ce graphe</h2>
       <button class="modal-close" id="shareModalClose">✕</button>
     </div>
     <div class="modal-body">
-
-      <div class="share-row">
-        <input type="email" id="shareEmail" placeholder="Email du collaborateur" />
-        <select id="shareRole">
-          <option value="viewer">Lecteur</option>
-          <option value="editor">Éditeur</option>
+      <p class="empty-hint" style="margin-top:0;">Invitez un collaborateur par email.</p>
+      
+      <div style="margin-bottom: 15px;">
+        <label for="shareEmail" style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); text-transform:uppercase;">Adresse Email</label>
+        <input type="email" id="shareEmail" placeholder="nom@exemple.com" style="width:100%; background:var(--bg-primary); border:1px solid var(--border); border-radius:24px; padding:10px 16px; color:var(--text-primary); margin-top:6px; outline:none;" />
+      </div>
+      
+      <div style="margin-bottom: 24px;">
+        <label for="shareRole" style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); text-transform:uppercase;">Rôle</label>
+        <select id="shareRole" style="width:100%; background:var(--bg-primary); border:1px solid var(--border); border-radius:24px; padding:10px 16px; color:var(--text-primary); margin-top:6px; outline:none; font-family:var(--font-sans); cursor:pointer;">
+          <option value="viewer">Viewer (Lecture seule)</option>
+          <option value="editor">Editor (Modification)</option>
         </select>
       </div>
-
-      <button id="confirmShareBtn" class="pill-btn pill-btn-ghost" style="width:100%; justify-content:center;">
-        <i class="fa-solid fa-paper-plane"></i> Inviter
-      </button>
-      <p id="shareStatusMsg" style="font-size: 12px; margin-top: 10px; text-align: center; display: none; font-family: var(--font-mono);"></p>
-
-      <hr class="share-divider" />
-
-      <div class="share-link-row">
-        <span id="shareLinkText" class="share-link-text">https://…</span>
-        <button id="modalCopyLinkBtn" class="icon-btn-round" title="Copier le lien"><i class="fa-regular fa-copy" style="font-size:13px;"></i></button>
-      </div>
-
+      
+      <button id="confirmShareBtn" class="run-btn" style="margin-bottom: 0; border-radius: 24px;">Envoyer l'invitation</button>
+      <p id="shareStatusMsg" style="font-size: 12px; margin-top: 12px; text-align: center; display: none; font-family: var(--font-mono);"></p>
     </div>
   </div>
 </div>
@@ -358,32 +265,15 @@
 
 <!-- ---------- Manage Access Modal ---------- -->
 <div class="modal-backdrop" id="manageModalBackdrop">
-  <div class="modal modal-card" style="width: min(500px, 90vw);">
+  <div class="modal" style="width: min(500px, 90vw);">
     <div class="modal-header">
-      <h2><i class="fa-solid fa-users" style="color:var(--primary); margin-right:8px;"></i>Accès</h2>
+      <h2>Gérer les accès</h2>
       <button class="modal-close" id="manageModalClose">✕</button>
     </div>
     <div class="modal-body">
-      <div id="pendingRequestsList" class="pending-requests-list"></div>
-      <div id="membersList" class="members-list">
+      <div id="membersList" style="max-height: 350px; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
          <p style="text-align: center; color: var(--text-muted); font-size: 14px;">Chargement des collaborateurs...</p>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ---------- Request Access Modal (tiers sans accès) ---------- -->
-<div class="modal-backdrop" id="requestAccessModalBackdrop">
-  <div class="modal" style="width: min(400px, 90vw);">
-    <div class="modal-header">
-      <h2>Demander l'accès</h2>
-      <button class="modal-close" id="requestAccessModalClose">✕</button>
-    </div>
-    <div class="modal-body">
-      <p class="empty-hint" style="margin-top:0;">Ce graphe est privé. Tu n'y as pas encore accès.</p>
-      <p id="requestAccessGraphTitle" style="font-weight:bold; font-size:16px; margin: 10px 0 20px;"></p>
-      <button id="submitAccessRequestBtn" class="run-btn" style="margin-bottom: 0; border-radius: 24px;">Demander l'accès au propriétaire</button>
-      <p id="requestAccessStatus" style="font-size: 12px; margin-top: 12px; text-align: center; display: none; font-family: var(--font-mono);"></p>
     </div>
   </div>
 </div>
