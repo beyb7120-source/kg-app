@@ -1111,18 +1111,22 @@ async function loadCollaborators() {
         if (allMembers.length === 0) { html = '<p>Aucun collaborateur.</p>'; } 
         else {
             allMembers.forEach(member => {
-                const status = member.confirm ? '<span style="color:#8fbf7f">(Actif)</span>' : '<span style="color:#e06b6b">(En attente)</span>';
+                const status = member.confirm ? '<span style="color:#7fe0a0">Actif</span>' : '<span style="color:var(--tertiary)">En attente</span>';
                 const userDisplay = member.userEmail || member.userName || "Utilisateur invité";
+                const initial = userDisplay.trim().charAt(0).toUpperCase() || "?";
                 const nextRole = member.role === 'viewer' ? 'editor' : 'viewer';
                 html += `
-                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--border);">
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                        <span style="font-weight:bold; font-size:14px; color:var(--text-primary);">${userDisplay}</span>
-                        <span style="font-size:12px; color:var(--text-muted);">Rôle: <strong style="text-transform:capitalize; color:var(--text-primary);">${member.role}</strong> ${status}</span>
+                <div class="member-row">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div class="member-avatar secondary">${initial}</div>
+                        <div class="member-info">
+                            <span class="member-name">${userDisplay}</span>
+                            <span class="member-meta">${member.role} · ${status}</span>
+                        </div>
                     </div>
-                    <div style="display:flex; gap:8px;">
-                        <button onclick="changeRole('${teamId}', '${member.$id}', '${nextRole}')" class="secondary-btn" style="padding:6px 12px; font-size:12px; border-radius:8px;">Inverser</button>
-                        <button onclick="revokeAccess('${teamId}', '${member.$id}')" class="danger-btn" style="padding:6px 12px; font-size:12px; background:#e06b6b; color:#fff; border:none; border-radius:8px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button onclick="changeRole('${teamId}', '${member.$id}', '${nextRole}')" class="icon-btn-round" title="Inverser le rôle"><i class="fa-solid fa-repeat" style="font-size:12px;"></i></button>
+                        <button onclick="revokeAccess('${teamId}', '${member.$id}')" class="icon-btn-round" title="Révoquer l'accès"><i class="fa-solid fa-trash" style="font-size:12px;"></i></button>
                     </div>
                 </div>`;
             });
@@ -1288,20 +1292,20 @@ function renderPendingRequests() {
     const listEl = document.getElementById("pendingRequestsList");
     if (!listEl) return;
     if (pendingRequestsCache.length === 0) { listEl.innerHTML = ''; return; }
-    listEl.innerHTML = `<p style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Demandes en attente</p>` +
+    listEl.innerHTML = `<p class="pending-title">En attente (${pendingRequestsCache.length})</p>` +
         pendingRequestsCache.map(req => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-primary); padding:12px; border-radius:12px; border:1px solid var(--accent-cyan); margin-bottom:10px;">
-                <div style="display:flex; flex-direction:column; gap:4px;">
-                    <span style="font-weight:bold; font-size:14px;">${escapeHtml(req.requesterName || req.requesterEmail)}</span>
-                    <span style="font-size:12px; color:var(--text-muted);">${escapeHtml(req.requesterEmail)}</span>
+            <div class="pending-row">
+                <div class="member-info">
+                    <span class="member-name">${escapeHtml(req.requesterName || req.requesterEmail)}</span>
+                    <span class="member-meta pending-status">Demande d'accès · ${escapeHtml(req.requesterEmail)}</span>
                 </div>
                 <div style="display:flex; gap:6px; align-items:center;">
-                    <select id="role-${req.$id}" style="border-radius:8px; padding:4px 6px; background:var(--bg-panel); color:var(--text-primary); border:1px solid var(--border);">
+                    <select id="role-${req.$id}" style="border-radius:8px; padding:4px 6px; background:rgba(255,255,255,0.05); color:var(--text-primary); border:1px solid var(--glass-border-bottom);">
                         <option value="viewer">Viewer</option>
                         <option value="editor">Editor</option>
                     </select>
-                    <button onclick="acceptAccessRequest('${req.$id}')" class="secondary-btn" style="padding:6px 10px; color:#8fbf7f;">Accepter</button>
-                    <button onclick="rejectAccessRequest('${req.$id}')" class="danger-btn" style="padding:6px 10px; background:#e06b6b; color:#fff;">Refuser</button>
+                    <button onclick="acceptAccessRequest('${req.$id}')" class="icon-btn-round accept" title="Accepter"><i class="fa-solid fa-check" style="font-size:12px;"></i></button>
+                    <button onclick="rejectAccessRequest('${req.$id}')" class="icon-btn-round" title="Refuser"><i class="fa-solid fa-xmark" style="font-size:12px;"></i></button>
                 </div>
             </div>`).join('');
 }

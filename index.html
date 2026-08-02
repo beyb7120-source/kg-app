@@ -139,21 +139,26 @@
 <!-- 3. نافذة إضافة المصادر (القائمة الرئيسية) -->
 <!-- ========================================== -->
 <div id="addSourceModalBackdrop" class="modal-backdrop">
-    <div class="modal-body" style="text-align: center; width: 600px; max-width: 90vw; border-radius: 12px; padding: 40px; background-color: #111214;">
-        <button id="closeAddSourceModal" class="close-btn" style="position: absolute; top: 20px; right: 20px; background: none; border: none; color: white; cursor: pointer; font-size: 22px;"><i class="fa-solid fa-xmark"></i></button>
-        
-        <h2 style="margin-bottom: 30px; font-weight: normal; font-size: 22px; color: white; text-transform: none;">Create your graph from your sources</h2>
-        
-        <div style="border: 1px dashed #3f4147; border-radius: 12px; padding: 40px 20px; background-color: #1e1f22;">
-            <h3 style="margin-bottom: 10px; font-weight: normal; font-size: 18px;">or drop your files</h3>
-            <p style="color: var(--text-muted); margin-bottom: 30px; font-size: 14px;">pdf, images, docs, audio, <span style="color: #b9bbbe; text-decoration: underline; cursor: pointer;">and more</span></p>
-            
-            <div class="add-source-options" style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;">
-                <button id="uploadFilesBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-solid fa-upload"></i> Upload files</button>
-                <button id="websitesBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-solid fa-link"></i> Websites</button>
-<button id="driveLinkBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-brands fa-google-drive"></i> Lien Google Drive</button>                <button id="copiedTextBtn" style="border-radius: 20px; padding: 10px 18px; background-color: #2b2d31; color: white; border: 1px solid #3f4147; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;"><i class="fa-solid fa-clipboard"></i> Copied text</button>
-                <input type="file" id="multiPdfInput" multiple accept="application/pdf" style="display: none;">
-            </div>
+    <div class="modal modal-card">
+        <button id="closeAddSourceModal" class="modal-close modal-card-close" aria-label="Fermer"><i class="fa-solid fa-xmark"></i></button>
+
+        <div class="modal-card-header">
+            <i class="fa-solid fa-circle-plus"></i>
+            <h2>Ajouter une source</h2>
+        </div>
+
+        <div class="source-dropzone-new">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <p>Glissez-déposez vos fichiers ici</p>
+            <span class="mono-hint">PDF, DOCX, TXT (Max 50MB)</span>
+        </div>
+
+        <div class="add-source-options pill-btn-group">
+            <button id="uploadFilesBtn" class="pill-btn"><i class="fa-solid fa-upload"></i> Télécharger</button>
+            <button id="websitesBtn" class="pill-btn"><i class="fa-solid fa-globe"></i> Sites web</button>
+            <button id="driveLinkBtn" class="pill-btn"><i class="fa-brands fa-google-drive"></i> Google Drive</button>
+            <button id="copiedTextBtn" class="pill-btn"><i class="fa-regular fa-copy"></i> Texte copié</button>
+            <input type="file" id="multiPdfInput" multiple accept="application/pdf" style="display: none;">
         </div>
     </div>
 </div>
@@ -163,19 +168,17 @@
 <!-- 4. نافذة النص المنسوخ (Copied Text) -->
 <!-- ========================================== -->
 <div id="copiedTextModalBackdrop" class="modal-backdrop">
-    <div class="modal-body" style="width: 600px; max-width: 90vw; padding: 25px; background-color: #111214; border-radius: 12px; text-align: left;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-            <h2 style="margin: 0; font-size: 20px; font-weight: 500; display: flex; align-items: center; gap: 15px; color: white; text-transform: none;">
-                <i class="fa-solid fa-arrow-left" style="cursor: pointer; color: var(--text-muted);" id="backFromCopiedText"></i> Paste copied text
-            </h2>
-            <button id="closeCopiedTextModal" class="close-btn" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px;"><i class="fa-solid fa-xmark"></i></button>
+    <div class="modal modal-card modal-card-left">
+        <div class="modal-card-header modal-card-header-row">
+            <h2><i class="fa-solid fa-arrow-left modal-back-icon" id="backFromCopiedText"></i> Coller le texte copié</h2>
+            <button id="closeCopiedTextModal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">Paste your copied text below to upload as a source</p>
-        
-        <textarea id="copiedTextInput" placeholder="Paste text here" style="width: 100%; height: 280px; background-color: #1e1f22; border: 1px solid #5865F2; border-radius: 12px; color: white; padding: 15px; resize: none; font-family: inherit; margin-bottom: 20px; outline: none; font-size: 14px;"></textarea>
-        
-        <div style="display: flex; justify-content: flex-end;">
-            <button id="insertCopiedTextBtn" style="border-radius: 20px; padding: 10px 25px; background-color: #3b3f46; color: white; border: none; cursor: pointer; font-size: 14px; transition: 0.2s;">Insert</button>
+        <p class="modal-card-hint">Colle le texte copié ci-dessous pour l'ajouter comme source.</p>
+
+        <textarea id="copiedTextInput" class="modal-textarea" placeholder="Coller le texte ici"></textarea>
+
+        <div class="modal-card-actions">
+            <button id="insertCopiedTextBtn" class="pill-btn pill-btn-primary">Insérer</button>
         </div>
     </div>
 </div>
@@ -184,29 +187,26 @@
 <!-- 5. نافذة الروابط (Websites) -->
 <!-- ========================================== -->
 <div id="websitesModalBackdrop" class="modal-backdrop">
-    <div class="modal-body" style="width: 600px; max-width: 90vw; padding: 25px; background-color: #111214; border-radius: 12px; text-align: left;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-            <h2 style="margin: 0; font-size: 20px; font-weight: 500; display: flex; align-items: center; gap: 15px; color: white; text-transform: none;">
-                <i class="fa-solid fa-arrow-left" style="cursor: pointer; color: var(--text-muted);" id="backFromWebsites"></i> Website and YouTube URLs
-            </h2>
-            <button id="closeWebsitesModal" class="close-btn" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 20px;"><i class="fa-solid fa-xmark"></i></button>
+    <div class="modal modal-card modal-card-left">
+        <div class="modal-card-header modal-card-header-row">
+            <h2><i class="fa-solid fa-arrow-left modal-back-icon" id="backFromWebsites"></i> URLs de sites web et YouTube</h2>
+            <button id="closeWebsitesModal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 15px;">Paste in website and YouTube URLs below to upload as a source</p>
-        
-        <textarea id="websitesInput" placeholder="Paste any links" style="width: 100%; height: 180px; background-color: #1e1f22; border: 1px solid #5865F2; border-radius: 12px; color: white; padding: 15px; resize: none; font-family: inherit; margin-bottom: 20px; outline: none; font-size: 14px;"></textarea>
-        
-        <ul style="color: var(--text-muted); font-size: 13px; line-height: 1.8; padding-left: 20px; margin-bottom: 25px;">
-            <li>To add multiple URLs, separate with a space or new line.</li>
-            <li>Only the visible text on the website will be imported at this time.</li>
-            <li>Paid articles are not supported.</li>
-            <li>Only the text transcript in YouTube will be imported at this time.</li>
-            <li>Only public YouTube videos are supported.</li>
-            <li>Recently uploaded videos may not be available to import.</li>
-         
+        <p class="modal-card-hint">Colle des liens de sites web ou YouTube ci-dessous pour les ajouter comme sources.</p>
+
+        <textarea id="websitesInput" class="modal-textarea modal-textarea-sm" placeholder="Coller n'importe quel lien"></textarea>
+
+        <ul class="modal-card-list">
+            <li>Pour ajouter plusieurs URLs, sépare-les par un espace ou une nouvelle ligne.</li>
+            <li>Seul le texte visible du site sera importé pour l'instant.</li>
+            <li>Les articles payants ne sont pas supportés.</li>
+            <li>Seule la transcription texte de YouTube sera importée pour l'instant.</li>
+            <li>Seules les vidéos YouTube publiques sont supportées.</li>
+            <li>Les vidéos récemment mises en ligne peuvent ne pas être disponibles.</li>
         </ul>
 
-        <div style="display: flex; justify-content: flex-end;">
-            <button id="insertWebsitesBtn" style="border-radius: 20px; padding: 10px 25px; background-color: #3b3f46; color: white; border: none; cursor: pointer; font-size: 14px; transition: 0.2s;">Insert</button>
+        <div class="modal-card-actions">
+            <button id="insertWebsitesBtn" class="pill-btn pill-btn-primary">Insérer</button>
         </div>
     </div>
 </div>
@@ -271,7 +271,7 @@
 <div class="modal-backdrop" id="pathModalBackdrop">
   <div class="modal">
     <div class="modal-header">
-      <h2>Parcours d'apprentissage conseillé</h2>
+      <h2><i class="fa-solid fa-route" style="color:var(--primary); margin-right:8px;"></i>Parcours d'apprentissage conseillé</h2>
       <div class="modal-header-actions">
         <button id="arrangeGraphBtn" class="icon-btn" title="Organiser le graphe (vue parcours)" aria-label="Organiser le graphe en vue parcours" disabled>
           <i class="fa-solid fa-diagram-project"></i>
@@ -302,7 +302,7 @@
 <div class="modal-backdrop" id="addRelationModalBackdrop">
   <div class="modal">
     <div class="modal-header">
-      <h2>Ajouter une relation manuelle</h2>
+      <h2><i class="fa-solid fa-link" style="color:var(--primary); margin-right:8px;"></i>Ajouter une relation manuelle</h2>
       <button class="modal-close" id="addRelationModalClose" aria-label="Fermer">✕</button>
     </div>
     <div class="modal-body">
@@ -333,28 +333,28 @@
 
 <!-- ---------- Share Modal ---------- -->
 <div class="modal-backdrop" id="shareModalBackdrop">
-  <div class="modal" style="width: min(400px, 90vw);">
+  <div class="modal modal-card" style="width: min(420px, 90vw);">
     <div class="modal-header">
-      <h2>Partager ce graphe</h2>
+      <h2><i class="fa-solid fa-share-nodes" style="color:var(--secondary); margin-right:8px;"></i>Partager ce graphe</h2>
       <button class="modal-close" id="shareModalClose">✕</button>
     </div>
     <div class="modal-body">
       <p class="empty-hint" style="margin-top:0;">Invitez un collaborateur par email.</p>
-      
-      <div style="margin-bottom: 15px;">
-        <label for="shareEmail" style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); text-transform:uppercase;">Adresse Email</label>
-        <input type="email" id="shareEmail" placeholder="nom@exemple.com" style="width:100%; background:var(--bg-primary); border:1px solid var(--border); border-radius:24px; padding:10px 16px; color:var(--text-primary); margin-top:6px; outline:none;" />
+
+      <div class="share-field">
+        <label for="shareEmail" class="share-field-label">Adresse Email</label>
+        <input type="email" id="shareEmail" placeholder="nom@exemple.com" />
       </div>
-      
-      <div style="margin-bottom: 24px;">
-        <label for="shareRole" style="font-size:11px; color:var(--text-muted); font-family:var(--font-mono); text-transform:uppercase;">Rôle</label>
-        <select id="shareRole" style="width:100%; background:var(--bg-primary); border:1px solid var(--border); border-radius:24px; padding:10px 16px; color:var(--text-primary); margin-top:6px; outline:none; font-family:var(--font-sans); cursor:pointer;">
+
+      <div class="share-field">
+        <label for="shareRole" class="share-field-label">Rôle</label>
+        <select id="shareRole">
           <option value="viewer">Viewer (Lecture seule)</option>
           <option value="editor">Editor (Modification)</option>
         </select>
       </div>
-      
-      <button id="confirmShareBtn" class="run-btn" style="margin-bottom: 0; border-radius: 24px;">Envoyer l'invitation</button>
+
+      <button id="confirmShareBtn" class="pill-btn pill-btn-primary" style="width:100%; justify-content:center;">Envoyer l'invitation</button>
       <p id="shareStatusMsg" style="font-size: 12px; margin-top: 12px; text-align: center; display: none; font-family: var(--font-mono);"></p>
     </div>
   </div>
@@ -363,14 +363,14 @@
 
 <!-- ---------- Manage Access Modal ---------- -->
 <div class="modal-backdrop" id="manageModalBackdrop">
-  <div class="modal" style="width: min(500px, 90vw);">
+  <div class="modal modal-card" style="width: min(500px, 90vw);">
     <div class="modal-header">
-      <h2>Gérer les accès</h2>
+      <h2><i class="fa-solid fa-users" style="color:var(--primary); margin-right:8px;"></i>Accès</h2>
       <button class="modal-close" id="manageModalClose">✕</button>
     </div>
     <div class="modal-body">
-      <div id="pendingRequestsList" style="margin-bottom: 10px;"></div>
-      <div id="membersList" style="max-height: 350px; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+      <div id="pendingRequestsList" class="pending-requests-list"></div>
+      <div id="membersList" class="members-list">
          <p style="text-align: center; color: var(--text-muted); font-size: 14px;">Chargement des collaborateurs...</p>
       </div>
     </div>
