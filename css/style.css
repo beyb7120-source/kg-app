@@ -1370,17 +1370,49 @@ input[type="range"]::-moz-range-thumb {
 .icon-btn-round.accept { background: rgba(216, 185, 255, 0.2); color: var(--primary); }
 .icon-btn-round.accept:hover { background: rgba(216, 185, 255, 0.35); }
 
-.share-field { margin-bottom: 16px; }
-.share-field-label {
-  display: block;
-  font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);
-  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;
-}
-.share-field input, .share-field select { width: 100%; }
 
 .members-list { max-height: 320px; overflow-y: auto; margin-top: 4px; display: flex; flex-direction: column; }
 .pending-requests-list:not(:empty) { margin-bottom: 6px; }
 .pending-requests-list .pending-title {
   font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);
   text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px;
+}
+
+/* ============================================================
+   session 5 — rattrapage "Partager": fusion du bouton copier-lien
+   dans la modale (au lieu de rester isolé dans la topbar), layout
+   email+rôle côte à côte, bouton "Inviter" en verre (pas gradient),
+   comme dans la maquette de référence.
+   ============================================================ */
+.share-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.share-row input { flex: 1; min-width: 0; }
+.share-row select { width: 130px; flex-shrink: 0; cursor: pointer; }
+
+.pill-btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border-top);
+  font-weight: 500;
+}
+.pill-btn-ghost:hover { background: rgba(255, 255, 255, 0.14); }
+
+.share-divider { border: none; border-top: 1px solid var(--glass-border-bottom); margin: 18px 0 14px; }
+
+.share-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border-bottom);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.share-link-text {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -51,7 +51,7 @@ function updateAccessButtonsVisibility() {
     document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
     document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
     const copyLinkBtn = document.getElementById('copyLinkBtn');
-    if (copyLinkBtn) copyLinkBtn.style.display = currentDbId ? 'block' : 'none';
+    if (copyLinkBtn) copyLinkBtn.style.display = currentDbId ? 'inline-flex' : 'none';
 }
 
 const teamIdParam = urlParams.get('teamId');
@@ -156,6 +156,8 @@ const shareModalBackdrop = document.getElementById("shareModalBackdrop");
 const openShareModalBtn = document.getElementById("openShareModalBtn");
 const shareModalClose = document.getElementById("shareModalClose");
 const copyLinkBtn = document.getElementById("copyLinkBtn");
+const modalCopyLinkBtn = document.getElementById("modalCopyLinkBtn"); // زر الكوبي الجديد المدموج داخل مودال "Partager"
+const shareLinkText = document.getElementById("shareLinkText"); // النص اللي كيبين الرابط داخل نفس المودال
 const confirmShareBtn = document.getElementById("confirmShareBtn");
 const shareStatusMsg = document.getElementById("shareStatusMsg");
 const manageModalBackdrop = document.getElementById("manageModalBackdrop");
@@ -1033,7 +1035,10 @@ function escapeHtml(str) { const div = document.createElement("div"); div.textCo
 // ============================================================
 // Sharing and Access
 // ============================================================
-openShareModalBtn.addEventListener("click", () => { shareModalBackdrop.classList.add("open"); });
+openShareModalBtn.addEventListener("click", () => {
+    shareModalBackdrop.classList.add("open");
+    if (shareLinkText && currentDbId) shareLinkText.textContent = window.location.origin + "/index.html?graphId=" + currentDbId;
+});
 function closeShareModal() {
     shareModalBackdrop.classList.remove("open");
     document.getElementById("shareStatusMsg").style.display = "none";
@@ -1042,14 +1047,14 @@ function closeShareModal() {
 shareModalClose.addEventListener("click", closeShareModal);
 shareModalBackdrop.addEventListener("click", (e) => { if (e.target === shareModalBackdrop) closeShareModal(); });
 
-if (copyLinkBtn) {
-    copyLinkBtn.addEventListener("click", async () => {
-        if (!currentDbId) return;
-        const link = window.location.origin + "/index.html?graphId=" + currentDbId;
-        try { await navigator.clipboard.writeText(link); showToast("Lien copié.", "success"); } 
-        catch { prompt("Copie ce lien :", link); }
-    });
+async function copyGraphLink() {
+    if (!currentDbId) return;
+    const link = window.location.origin + "/index.html?graphId=" + currentDbId;
+    try { await navigator.clipboard.writeText(link); showToast("Lien copié.", "success"); }
+    catch { prompt("Copie ce lien :", link); }
 }
+if (copyLinkBtn) copyLinkBtn.addEventListener("click", copyGraphLink);
+if (modalCopyLinkBtn) modalCopyLinkBtn.addEventListener("click", copyGraphLink);
 
 async function ensureShareTeam(graphId) {
     const teamId = teamIdFor(graphId);

@@ -66,9 +66,9 @@
 
 <!-- أزرار المشاركة والإدارة (غيبانو ويتخباو بالـ JS على حساب واش نتا Owner أو Viewer) -->
 <div id="graphActions" style="display: flex; align-items: center; margin-right: 15px; gap: 10px;">
-    <!-- زر عمومي: كلشي (Owner/Editor/Viewer) يقدر يكوبي الرابط ويشاركو -->
-    <button id="copyLinkBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px; background: var(--bg-panel);">
-        <i class="fa-solid fa-link"></i> Copier le lien
+    <!-- زر عمومي مصغّر: كلشي (خصوصا الضيوف اللي مقدروش يحلو مودال Partager) يقدر يكوبي الرابط ديركت -->
+    <button id="copyLinkBtn" class="icon-btn" title="Copier le lien du graphe" aria-label="Copier le lien du graphe" style="display:none;">
+        <i class="fa-solid fa-link"></i>
     </button>
     <!-- أزرار صاحب المبيان -->
     <button id="openManageModalBtn" class="secondary-btn" style="display:none; width: auto; padding: 6px 16px; border-radius: 24px; background: var(--bg-panel); position: relative;">
@@ -339,23 +339,27 @@
       <button class="modal-close" id="shareModalClose">✕</button>
     </div>
     <div class="modal-body">
-      <p class="empty-hint" style="margin-top:0;">Invitez un collaborateur par email.</p>
 
-      <div class="share-field">
-        <label for="shareEmail" class="share-field-label">Adresse Email</label>
-        <input type="email" id="shareEmail" placeholder="nom@exemple.com" />
-      </div>
-
-      <div class="share-field">
-        <label for="shareRole" class="share-field-label">Rôle</label>
+      <div class="share-row">
+        <input type="email" id="shareEmail" placeholder="Email du collaborateur" />
         <select id="shareRole">
-          <option value="viewer">Viewer (Lecture seule)</option>
-          <option value="editor">Editor (Modification)</option>
+          <option value="viewer">Lecteur</option>
+          <option value="editor">Éditeur</option>
         </select>
       </div>
 
-      <button id="confirmShareBtn" class="pill-btn pill-btn-primary" style="width:100%; justify-content:center;">Envoyer l'invitation</button>
-      <p id="shareStatusMsg" style="font-size: 12px; margin-top: 12px; text-align: center; display: none; font-family: var(--font-mono);"></p>
+      <button id="confirmShareBtn" class="pill-btn pill-btn-ghost" style="width:100%; justify-content:center;">
+        <i class="fa-solid fa-paper-plane"></i> Inviter
+      </button>
+      <p id="shareStatusMsg" style="font-size: 12px; margin-top: 10px; text-align: center; display: none; font-family: var(--font-mono);"></p>
+
+      <hr class="share-divider" />
+
+      <div class="share-link-row">
+        <span id="shareLinkText" class="share-link-text">https://…</span>
+        <button id="modalCopyLinkBtn" class="icon-btn-round" title="Copier le lien"><i class="fa-regular fa-copy" style="font-size:13px;"></i></button>
+      </div>
+
     </div>
   </div>
 </div>
