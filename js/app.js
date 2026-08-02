@@ -431,7 +431,7 @@ closeSourceResultBtn.addEventListener("click", () => {
 account.get()
     .then(async (response) => {
         currentUser = response;
-        document.body.style.display = 'block'; 
+        document.body.style.display = 'flex';
         document.getElementById('userNameDisplay').textContent = response.name || response.email || 'Utilisateur';
 
         if (teamIdParam && membershipIdParam && userIdParam && secretParam) {
