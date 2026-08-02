@@ -47,10 +47,14 @@ let currentGraphOwnerId = null;
 let currentUserRole = 'owner';
 
 function updateAccessButtonsVisibility() {
-    document.getElementById('openShareModalBtn').style.display = isOwner ? 'block' : 'none';
-    document.getElementById('openManageModalBtn').style.display = isOwner ? 'block' : 'none';
-    document.getElementById('leaveGraphBtn').style.display = !isOwner ? 'block' : 'none';
+    const shareBtn = document.getElementById('openShareModalBtn');
+    const manageBtn = document.getElementById('openManageModalBtn');
+    const leaveBtn = document.getElementById('leaveGraphBtn');
     const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+    if (shareBtn) shareBtn.style.display = isOwner ? 'block' : 'none';
+    if (manageBtn) manageBtn.style.display = isOwner ? 'block' : 'none';
+    if (leaveBtn) leaveBtn.style.display = !isOwner ? 'block' : 'none';
     if (copyLinkBtn) copyLinkBtn.style.display = currentDbId ? 'inline-flex' : 'none';
 }
 
@@ -1035,10 +1039,12 @@ function escapeHtml(str) { const div = document.createElement("div"); div.textCo
 // ============================================================
 // Sharing and Access
 // ============================================================
-openShareModalBtn.addEventListener("click", () => {
-    shareModalBackdrop.classList.add("open");
-    if (shareLinkText && currentDbId) shareLinkText.textContent = window.location.origin + "/index.html?graphId=" + currentDbId;
-});
+if (openShareModalBtn) {
+    openShareModalBtn.addEventListener("click", () => {
+        shareModalBackdrop.classList.add("open");
+        if (shareLinkText && currentDbId) shareLinkText.textContent = window.location.origin + "/index.html?graphId=" + currentDbId;
+    });
+}
 function closeShareModal() {
     shareModalBackdrop.classList.remove("open");
     document.getElementById("shareStatusMsg").style.display = "none";
@@ -1096,11 +1102,13 @@ confirmShareBtn.addEventListener("click", async () => {
     } finally { confirmShareBtn.disabled = false; }
 });
 
-openManageModalBtn.addEventListener("click", async () => {
-    manageModalBackdrop.classList.add("open");
-    await loadCollaborators();
-    renderPendingRequests();
-});
+if (openManageModalBtn) {
+    openManageModalBtn.addEventListener("click", async () => {
+        manageModalBackdrop.classList.add("open");
+        await loadCollaborators();
+        renderPendingRequests();
+    });
+}
 manageModalClose.addEventListener("click", () => manageModalBackdrop.classList.remove("open"));
 manageModalBackdrop.addEventListener("click", (e) => { if (e.target === manageModalBackdrop) manageModalBackdrop.classList.remove("open"); });
 
