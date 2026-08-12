@@ -1412,7 +1412,9 @@ input[type="range"]::-moz-range-thumb {
    ============================================================ */
 .toolbar-menu-container { position: relative; }
 .toolbar-dropdown {
-  position: absolute; top: 40px; right: 0;
+  position: absolute; 
+  top: 40px; 
+  right: 0;
   background: var(--bg-panel-raised);
   border: 1px solid var(--glass-border-bottom);
   border-radius: 12px;
@@ -1420,6 +1422,7 @@ input[type="range"]::-moz-range-thumb {
   display: none; flex-direction: column; z-index: 50; min-width: 170px;
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
+  z-index: 100;
 }
 .toolbar-dropdown.show { display: flex; }
 .toolbar-menu-item {

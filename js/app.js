@@ -175,6 +175,7 @@ const settingsBtn = document.getElementById("settingsBtn");
 const settingsDropdown = document.getElementById("settingsDropdown");
 
 // وظيفة باش نسدو كاع القوائم المفتوحة إيلا كليكينا فالتيران
+// وظيفة باش نسدو كاع القوائم المفتوحة إيلا كليكينا فالتيران
 function closeAllDropdowns() {
     if(graphOptionsDropdown) graphOptionsDropdown.classList.remove("show");
     if(settingsDropdown) settingsDropdown.classList.remove("show");
@@ -183,7 +184,7 @@ function closeAllDropdowns() {
 if (graphOptionsBtn) {
     graphOptionsBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        settingsDropdown?.classList.remove("show"); // سد الإعدادات إيلا كانت محلولة
+        settingsDropdown?.classList.remove("show");
         graphOptionsDropdown.classList.toggle("show");
     });
 }
@@ -191,9 +192,17 @@ if (graphOptionsBtn) {
 if (settingsBtn) {
     settingsBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        graphOptionsDropdown?.classList.remove("show"); // سد خيارات المبيان
+        graphOptionsDropdown?.classList.remove("show");
         settingsDropdown.classList.toggle("show");
     });
+}
+
+// 🔴 هادو هما السطورة اللي غيحلو مشكل الكتابة!
+if (settingsDropdown) {
+    settingsDropdown.addEventListener("click", (e) => e.stopPropagation());
+}
+if (graphOptionsDropdown) {
+    graphOptionsDropdown.addEventListener("click", (e) => e.stopPropagation());
 }
 
 window.addEventListener("click", closeAllDropdowns);
@@ -538,6 +547,7 @@ async function loadGraphFromDB(id) {
         exportJsonBtn.disabled = false;
         statsBtn.disabled = false;
         arrangeGraphBtn.disabled = false;
+        if (graphOptionsBtn) graphOptionsBtn.disabled = false;
 
         updateAccessButtonsVisibility();
         currentGraphOwnerId = doc.userId;
