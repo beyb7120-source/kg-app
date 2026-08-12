@@ -1443,3 +1443,18 @@ body, .layout {
 .topbar {
     background: rgba(4, 8, 15, 0.32) !important;
 }
+
+/* 🔴 إجبار الخلفية تكون شفافة باش يبان الشفق القطبي ومايبقاش الرمادي */
+html, body {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+
+/* 🔴 تطبيق تأثير الزجاج (Glass) ديالك على واجهة Constella */
+.panel, .graph-stage, .topbar {
+    background: rgba(4, 8, 15, 0.32) !important;
+    backdrop-filter: blur(22px) saturate(1.9) brightness(1.06) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(1.9) brightness(1.06) !important;
+    border: 1.5px solid rgba(255, 255, 255, 0.09) !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.65) !important;
+}
