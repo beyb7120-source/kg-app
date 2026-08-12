@@ -1,23 +1,22 @@
 :root {
-  /* Aurora Colors */
-  --surface: #04080F;
-  --primary: #7C3AED;
-  --secondary: #A78BFA;
-  --tertiary: #E6EDF3;
+  --surface: #131314;
+  --primary: #d8b9ff;
+  --secondary: #43ecdb;
+  --tertiary: #ffba20;
   --danger: #ffb4ab;
-  --on-surface: #E6EDF3;
-  --on-surface-variant: #cbced2;
+  --on-surface: #e5e2e3;
+  --on-surface-variant: #cec2d7;
 
-  /* Constella Aliases */
   --bg-primary: var(--surface);
-  --bg-panel: rgba(4, 8, 15, 0.32); /* خلفية زجاجية غامقة شوية */
-  --bg-panel-raised: rgba(124, 58, 237, 0.1);
+  --bg-panel: rgba(255, 255, 255, 0.05);
+  --bg-panel-raised: rgba(255, 255, 255, 0.08);
+  --grid-line: rgba(255, 255, 255, 0.05);
   --accent: var(--primary);
   --accent-cyan: var(--secondary);
   --text-primary: var(--on-surface);
   --text-muted: var(--on-surface-variant);
-  --border: rgba(255, 255, 255, 0.09);
-  
+  --border: rgba(255, 255, 255, 0.12);
+
   /* Aurora Glass Specs */
   --glass-blur: 22px;
   --glass-border-top: rgba(255, 255, 255, 0.16); /* اللمعة من الفوق */
@@ -37,7 +36,7 @@
 
 body {
   margin: 0;
-  background: var(--bg-primary);
+  background: var(--bg-primary); /* هادا هو السطر اللي كيعطي اللون الكحل الأصلي! */
   color: var(--text-primary);
   font-family: var(--font-sans);
   height: 100dvh;
