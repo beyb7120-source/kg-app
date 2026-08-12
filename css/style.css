@@ -1,45 +1,37 @@
 :root {
-  /* ============================================================
-     Constella — design tokens (Liquid Glass + Chromatography).
-     كنبقاو حافظين على نفس أسماء المتغيرات القديمة (--bg-primary,
-     --accent, --border...) باش JS/CSS القدام يخدموا بلا حتى تبديل —
-     غير القيم اللي تبدلات لدارك ديزاين جديد.
-     ============================================================ */
-  --surface: #131314;
-  --primary: #d8b9ff;
-  --secondary: #43ecdb;
-  --tertiary: #ffba20;
+  /* Aurora Colors */
+  --surface: #04080F;
+  --primary: #7C3AED;
+  --secondary: #A78BFA;
+  --tertiary: #E6EDF3;
   --danger: #ffb4ab;
-  --on-surface: #e5e2e3;
-  --on-surface-variant: #cec2d7;
+  --on-surface: #E6EDF3;
+  --on-surface-variant: #cbced2;
 
-  /* --- alias القدام (كايستعملهم كامل باقي الملف والـ HTML) --- */
+  /* Constella Aliases */
   --bg-primary: var(--surface);
-  --bg-panel: rgba(255, 255, 255, 0.05);
-  --bg-panel-raised: rgba(255, 255, 255, 0.08);
-  --grid-line: rgba(255, 255, 255, 0.05);
+  --bg-panel: rgba(4, 8, 15, 0.32); /* خلفية زجاجية غامقة شوية */
+  --bg-panel-raised: rgba(124, 58, 237, 0.1);
   --accent: var(--primary);
   --accent-cyan: var(--secondary);
   --text-primary: var(--on-surface);
   --text-muted: var(--on-surface-variant);
-  --border: rgba(255, 255, 255, 0.12);
-  --font-mono: "JetBrains Mono", monospace;
-  --font-sans: "Inter", sans-serif;
-  --font-display: "Geist", "Inter", sans-serif;
-
-  /* --- tokens ديال الزجاج (glass) --- */
-  --glass-blur: 20px;
-  --glass-border-top: rgba(255, 255, 255, 0.2);
-  --glass-border-bottom: rgba(255, 255, 255, 0.1);
-  --radius-card: 24px;
+  --border: rgba(255, 255, 255, 0.09);
+  
+  /* Aurora Glass Specs */
+  --glass-blur: 22px;
+  --glass-border-top: rgba(255, 255, 255, 0.16); /* اللمعة من الفوق */
+  --glass-border-bottom: rgba(255, 255, 255, 0.05);
+  --radius-card: 20px;
   --radius-pill: 9999px;
-  --glow-primary: 0 0 20px rgba(216, 185, 255, 0.4);
-  --glow-secondary: 0 0 20px rgba(67, 236, 219, 0.35);
+  --glow-primary: 0 40px 100px rgba(0,0,0,0.65), 0 0 40px rgba(124,58,237,0.3);
+  --glow-secondary: 0 0 20px rgba(167, 139, 250, 0.35);
 
-  /* متغيرات جديدة باش نتحكمو فالعرض ديال الـ Panels بالجران */
   --left-panel-width: 300px;
   --right-panel-width: 280px;
 }
+
+
 
 * { box-sizing: border-box; }
 
@@ -227,6 +219,14 @@ h2 { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.08em; tex
 }
 
 .block { margin-bottom: 22px; }
+
+.panel, .graph-stage, .modal, .node-popup {
+  background: var(--bg-panel);
+  backdrop-filter: blur(22px) saturate(1.9) brightness(1.06);
+  -webkit-backdrop-filter: blur(22px) saturate(1.9) brightness(1.06);
+  border: 1.5px solid var(--border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.65);
+}
 
 /* ---------- dropzone / inputs ---------- */
 .dropzone {
