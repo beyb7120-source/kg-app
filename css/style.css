@@ -1434,3 +1434,13 @@ input[type="range"]::-moz-range-thumb {
 .toolbar-menu-item:hover { background: rgba(255, 255, 255, 0.08); color: var(--secondary); }
 .toolbar-menu-item:disabled { opacity: 0.4; cursor: not-allowed; }
 .toolbar-menu-item i { width: 14px; color: var(--accent-cyan); }
+
+/* شفافية باش تبان خلفية الشفق القطبي المخصصة */
+body, .layout {
+    background: transparent !important;
+}
+
+/* باش الـ Topbar ما يغطيش الشفق بزايد */
+.topbar {
+    background: rgba(4, 8, 15, 0.32) !important;
+}
