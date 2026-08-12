@@ -46,21 +46,18 @@
   </div>
 
   <div class="topbar-side topbar-right">
-    <div class="key-field">
-      <label for="apiKey">Clé API Mistral</label>
-      <input id="apiKey" type="password" placeholder="colle ta clé ici" autocomplete="off" />
-      <label class="inline-checkbox">
-      </label>
+  <!-- خبينا الـ API Key وسط Dropdown -->
+  <div class="toolbar-menu-container" style="position: relative;">
+    <button id="settingsBtn" class="icon-btn" title="Paramètres (Clé API)"><i class="fa-solid fa-gear"></i></button>
+    <div id="settingsDropdown" class="toolbar-dropdown" style="padding: 15px; width: 250px;">
+      <label for="apiKey" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Clé API Mistral</label>
+      <input id="apiKey" type="password" placeholder="colle ta clé ici" autocomplete="off" style="width: 100%; margin-top: 5px; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: white;" />
     </div>
+  </div>
 
-    <div class="user-info">
-      <span id="userNameDisplay">Loading...</span>
-    </div>
-
-    <!-- زر المشاركة غنزيدوه حدا معلومات المستخدم -->
-<!-- <button id="openShareModalBtn" class="secondary-btn" style="width: auto; padding: 6px 16px; margin-right: 15px; border-radius: 24px;">
-    <i class="fa-solid fa-share-nodes"></i> Partager
-</button> -->
+  <div class="user-info">
+    <span id="userNameDisplay">Loading...</span>
+  </div>
 
 <!-- أزرار المشاركة والإدارة (غيبانو ويتخباو بالـ JS على حساب واش نتا Owner أو Viewer) -->
 <div id="graphActions" style="display: flex; align-items: center; margin-right: 15px; gap: 10px;">
@@ -209,19 +206,22 @@
 
   <section class="graph-stage">
     <div class="graph-toolbar">
-      <button id="learningPathBtn" class="icon-btn" title="Parcours conseillé" aria-label="Parcours d'apprentissage conseillé" disabled>
-        <i class="fa-solid fa-route"></i>
-      </button>
-      <button id="statsBtn" class="icon-btn" title="Statistiques du graphe" aria-label="Voir les statistiques du graphe" disabled>
-        <i class="fa-solid fa-chart-simple"></i>
-      </button>
-      <button id="exportJsonBtn" class="icon-btn" title="Exporter en JSON (données brutes)" aria-label="Exporter le graphe en JSON" disabled>
-        <i class="fa-solid fa-file-import"></i>
-      </button>
-      <button id="exportPdfBtn" class="icon-btn" title="Exporter en PDF" aria-label="Exporter le graphe en PDF" disabled>
-        <i class="fa-solid fa-file-arrow-down"></i>
-      </button>
+  <button id="learningPathBtn" class="icon-btn" title="Parcours conseillé" disabled>
+    <i class="fa-solid fa-route"></i>
+  </button>
+  
+  <!-- تجميع الأزرار الثانوية -->
+  <div class="toolbar-menu-container" style="position: relative; display: inline-block;">
+    <button id="graphOptionsBtn" class="icon-btn" title="Options du graphe" disabled>
+      <i class="fa-solid fa-ellipsis-vertical"></i>
+    </button>
+    <div id="graphOptionsDropdown" class="toolbar-dropdown">
+      <button id="statsBtn" class="toolbar-menu-item" disabled><i class="fa-solid fa-chart-simple"></i> Statistiques</button>
+      <button id="exportPdfBtn" class="toolbar-menu-item" disabled><i class="fa-solid fa-file-arrow-down"></i> Exporter PDF</button>
+      <button id="exportJsonBtn" class="toolbar-menu-item" disabled><i class="fa-solid fa-file-import"></i> Exporter JSON</button>
     </div>
+  </div>
+</div>
 
     <div class="confidence-control">
       <label for="confidenceSlider">Confiance min.</label>

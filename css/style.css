@@ -1405,3 +1405,29 @@ input[type="range"]::-moz-range-thumb {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* ============================================================
+   Dropdowns (Toolbar & Settings)
+   ============================================================ */
+.toolbar-menu-container { position: relative; }
+.toolbar-dropdown {
+  position: absolute; top: 40px; right: 0;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--glass-border-bottom);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  display: none; flex-direction: column; z-index: 50; min-width: 170px;
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+.toolbar-dropdown.show { display: flex; }
+.toolbar-menu-item {
+  background: transparent; border: none; color: var(--text-primary);
+  padding: 12px 14px; text-align: left; font-size: 12px; font-family: var(--font-sans);
+  cursor: pointer; display: flex; align-items: center; gap: 10px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.toolbar-menu-item:hover { background: rgba(255, 255, 255, 0.08); color: var(--secondary); }
+.toolbar-menu-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.toolbar-menu-item i { width: 14px; color: var(--accent-cyan); }

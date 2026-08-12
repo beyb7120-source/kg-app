@@ -169,6 +169,35 @@ const leaveGraphBtn = document.getElementById("leaveGraphBtn");
 const requestAccessModalBackdrop = document.getElementById("requestAccessModalBackdrop");
 const requestAccessModalClose = document.getElementById("requestAccessModalClose");
 
+const graphOptionsBtn = document.getElementById("graphOptionsBtn");
+const graphOptionsDropdown = document.getElementById("graphOptionsDropdown");
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsDropdown = document.getElementById("settingsDropdown");
+
+// وظيفة باش نسدو كاع القوائم المفتوحة إيلا كليكينا فالتيران
+function closeAllDropdowns() {
+    if(graphOptionsDropdown) graphOptionsDropdown.classList.remove("show");
+    if(settingsDropdown) settingsDropdown.classList.remove("show");
+}
+
+if (graphOptionsBtn) {
+    graphOptionsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        settingsDropdown?.classList.remove("show"); // سد الإعدادات إيلا كانت محلولة
+        graphOptionsDropdown.classList.toggle("show");
+    });
+}
+
+if (settingsBtn) {
+    settingsBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        graphOptionsDropdown?.classList.remove("show"); // سد خيارات المبيان
+        settingsDropdown.classList.toggle("show");
+    });
+}
+
+window.addEventListener("click", closeAllDropdowns);
+
 // ============================================================
 // Initialization & Basic Events
 // ============================================================
