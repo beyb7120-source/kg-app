@@ -1,209 +1,132 @@
 // ============================================================
-// chromaBackground.js — Aurora Background (Exact Match)
+// chromaBackground.js (Original WebGL - Fast & Lightweight)
 // ============================================================
 
+const VERTEX_SRC = `attribute vec2 a_position;
+varying vec2 v_texCoord;
+void main() {
+  v_texCoord = a_position * 0.5 + 0.5;
+  gl_Position = vec4(a_position, 0.0, 1.0);
+}`;
+
+const FRAGMENT_SRC = `precision highp float;
+uniform float u_time;
+uniform vec2 u_resolution;
+varying vec2 v_texCoord;
+
+float noise(vec2 p) {
+  return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float smoothNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float a = noise(i);
+  float b = noise(i + vec2(1.0, 0.0));
+  float c = noise(i + vec2(0.0, 1.0));
+  float d = noise(i + vec2(1.0, 1.0));
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+void main() {
+  vec2 uv = v_texCoord;
+  float t = u_time * 0.15;
+
+  vec3 col1 = vec3(0.847, 0.725, 1.0);   // Violet (primary)
+  vec3 col2 = vec3(0.263, 0.925, 0.859); // Teal (secondary)
+  vec3 col3 = vec3(1.0, 0.729, 0.125);   // Amber (tertiary)
+  vec3 col4 = vec3(1.0, 0.31, 0.52);     // Rose (accent)
+
+  float n1 = smoothNoise(uv * 2.0 + t);
+  float n2 = smoothNoise(uv * 1.5 - t * 0.8 + 10.0);
+  float n3 = smoothNoise(uv * 3.0 + t * 1.2 + 20.0);
+
+  vec3 bg = mix(col1, col2, n1);
+  bg = mix(bg, col3, n2);
+  bg = mix(bg, col4, n3);
+
+  gl_FragColor = vec4(bg * 0.14, 1.0);
+}`;
+
+function compileShader(gl, type, src) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, src);
+  gl.compileShader(shader);
+  return shader;
+}
+
 export function initChromaBackground(opts = {}) {
-    if (document.getElementById("aurora-sky")) return;
+  if (document.getElementById("chromaBackgroundCanvas")) return; 
 
-    // 1. إنشاء حاوية الخلفية
-    const sky = document.createElement("div");
-    sky.id = "aurora-sky";
-    sky.setAttribute("aria-hidden", "true");
-    Object.assign(sky.style, {
-        position: "fixed", inset: "0", zIndex: "-1", pointerEvents: "none"
-    });
+  const prefersReducedMotion = window.matchMedia?.(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
 
-    const cBg = document.createElement("canvas");
-    const cAurora = document.createElement("canvas");
-    const cStars = document.createElement("canvas");
-    
-    [cBg, cAurora, cStars].forEach(c => {
-        c.style.position = "absolute";
-        c.style.inset = "0";
-        c.style.width = "100%";
-        c.style.height = "100%";
-        sky.appendChild(c);
-    });
+  const wrap = document.createElement("div");
+  wrap.id = "chromaBackgroundWrap";
+  wrap.setAttribute("aria-hidden", "true");
+  Object.assign(wrap.style, {
+    position: "fixed",
+    inset: "0",
+    width: "100%",
+    height: "100%",
+    zIndex: "-1",
+    pointerEvents: "none",
+    opacity: String(opts.opacity ?? 0.5),
+  });
 
-    document.body.insertBefore(sky, document.body.firstChild);
+  const canvas = document.createElement("canvas");
+  canvas.id = "chromaBackgroundCanvas";
+  canvas.style.display = "block";
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  wrap.appendChild(canvas);
 
-    const ctxBg = cBg.getContext('2d');
-    const ctxA = cAurora.getContext('2d');
-    const ctxS = cStars.getContext('2d');
+  const target = (opts.targetId && document.getElementById(opts.targetId)) || document.body;
+  target.insertBefore(wrap, target.firstChild);
 
-    let W = 0, H = 0;
+  if (prefersReducedMotion) return; 
 
-    // 2. دوال الرياضيات (Smooth Noise)
-    const perm = (() => {
-        const p = new Uint8Array(512);
-        const base = [...Array(256)].map((_, i) => i);
-        for (let i = 255; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [base[i], base[j]] = [base[j], base[i]]; }
-        for (let i = 0; i < 512; i++) p[i] = base[i & 255];
-        return p;
-    })();
-
-    function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-    function lerp(a, b, t) { return a + t * (b - a); }
-    function grad1D(h, x) { return (h & 1) ? x : -x; }
-    function noise1(x) {
-        const xi = Math.floor(x) & 255;
-        const xf = x - Math.floor(x);
-        const u = fade(xf);
-        return lerp(grad1D(perm[xi], xf), grad1D(perm[xi + 1], xf - 1), u);
+  function syncSize() {
+    const w = canvas.clientWidth || 1280;
+    const h = canvas.clientHeight || 720;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
     }
-    function fbm(x, octs = 4) {
-        let v = 0, amp = .5, freq = 1, max = 0;
-        for (let i = 0; i < octs; i++) { v += noise1(x * freq) * amp; max += amp; amp *= .5; freq *= 2.1; }
-        return v / max;
-    }
+  }
+  if (typeof ResizeObserver !== "undefined") {
+    new ResizeObserver(syncSize).observe(canvas);
+  }
+  syncSize();
 
-    // 3. رسم سماء الليل والنجوم
-    function drawBg() {
-        ctxBg.clearRect(0, 0, W, H);
-        const g = ctxBg.createLinearGradient(0, 0, 0, H);
-        g.addColorStop(0, '#04080F');
-        g.addColorStop(0.55, '#060C18');
-        g.addColorStop(0.80, '#0A1628');
-        g.addColorStop(1, '#0D1F35');
-        ctxBg.fillStyle = g; 
-        ctxBg.fillRect(0, 0, W, H);
-    }
+  const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+  if (!gl) return; 
 
-    let stars = [];
-    function buildStars() {
-        stars = [];
-        for (let i = 0; i < 320; i++) {
-            stars.push({
-                x: Math.random(), y: Math.random() * .85,
-                r: Math.random() * 1.1 + .2, a: Math.random() * .5 + .45,
-                sp: Math.random() * .011 + .003, ph: Math.random() * Math.PI * 2
-            });
-        }
-    }
-    function drawStars(t) {
-        ctxS.clearRect(0, 0, W, H);
-        for (const s of stars) {
-            const pulse = Math.sin(t * s.sp + s.ph) * .35 + .65;
-            const al = s.a * pulse;
-            ctxS.beginPath(); ctxS.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
-            ctxS.fillStyle = `rgba(255,255,255,${al})`; 
-            ctxS.fill();
-        }
-    }
+  const program = gl.createProgram();
+  gl.attachShader(program, compileShader(gl, gl.VERTEX_SHADER, VERTEX_SRC));
+  gl.attachShader(program, compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SRC));
+  gl.linkProgram(program);
+  gl.useProgram(program);
 
-    // 4. رسم الشفق القطبي (Aurora) بالطبقات ديالك
-    const LAYERS_DARK = [
-        { type: 'cloud',   h: 160, s: 90, l: 30, a: 0.15, x: 0.2, y: 0.4, r: 0.5, nF: 0.001, nS: 0.00002 },
-        { type: 'cloud',   h: 210, s: 80, l: 35, a: 0.12, x: 0.8, y: 0.5, r: 0.6, nF: 0.002, nS: 0.00003 },
-        { type: 'arc',     h: 170, s: 90, l: 45, a: 0.5,  yC: 0.6, curve: -0.15, nF: 0.0015, nS: 0.00003, thick: 0.12 },
-        { type: 'curtain', h: 145, s: 100, l: 65, a: 0.85, yC: 0.65, curve: 0.1,  nF: 0.002, nS: 0.00006, hght: 0.4 },
-        { type: 'curtain', h: 155, s: 100, l: 75, a: 0.95, yC: 0.55, curve: -0.05, nF: 0.003, nS: 0.00008, hght: 0.3 }
-    ];
+  const buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  const posLoc = gl.getAttribLocation(program, "a_position");
+  gl.enableVertexAttribArray(posLoc);
+  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-    function drawCloudAurora(ctx, layer, t) {
-        const { h, s, l, a, x, y, r, nF, nS } = layer;
-        const nx = (x + fbm(t * nS, 2) * 0.2 - 0.1) * W;
-        const ny = (y + fbm(t * nS + 10, 2) * 0.2 - 0.1) * H;
-        const rad = r * Math.min(W, H) * (0.8 + 0.4 * fbm(t * nS * 2, 2));
-        const g = ctx.createRadialGradient(nx, ny, 0, nx, ny, rad);
-        g.addColorStop(0, `hsla(${h},${s}%,${l}%,${a})`);
-        g.addColorStop(1, `hsla(${h},${s}%,${l}%,0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(nx, ny, rad, 0, Math.PI * 2); ctx.fill();
-    }
+  const uTime = gl.getUniformLocation(program, "u_time");
+  const uRes = gl.getUniformLocation(program, "u_resolution");
 
-    function drawArc(ctx, layer, t) {
-        const { h, s, l, a, yC, curve, nF, nS, thick } = layer;
-        const PTS = 80;
-        const dx = W / (PTS - 1);
-        const topY = [], botY = [];
-
-        for (let i = 0; i < PTS; i++) {
-            const x = i * dx;
-            const arcOffset = Math.sin((x / W) * Math.PI) * curve * H;
-            const noise = (fbm(x * nF + t * nS, 3) - 0.5) * 0.15 * H;
-            const cy = yC * H + arcOffset + noise;
-            const hs = thick * H * 0.5;
-            topY.push(cy - hs);
-            botY.push(cy + hs);
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(0, topY[0]);
-        for (let i = 0; i < PTS - 1; i++) {
-            const cpx = (i * dx + (i + 1) * dx) * 0.5;
-            const cpy = (topY[i] + topY[i + 1]) * 0.5;
-            ctx.quadraticCurveTo(i * dx, topY[i], cpx, cpy);
-        }
-        ctx.lineTo(W, topY[PTS - 1]);
-        ctx.lineTo(W, botY[PTS - 1]);
-        for (let i = PTS - 2; i >= 0; i--) {
-            const cpx = (i * dx + (i + 1) * dx) * 0.5;
-            const cpy = (botY[i] + botY[i + 1]) * 0.5;
-            ctx.quadraticCurveTo((i + 1) * dx, botY[i + 1], cpx, cpy);
-        }
-        ctx.lineTo(0, botY[0]);
-        ctx.closePath();
-
-        const avgCy = topY[Math.floor(PTS/2)] + (botY[0]-topY[0])*.5;
-        const g = ctx.createLinearGradient(0, avgCy - thick * H * 0.5, 0, avgCy + thick * H * 0.5);
-        g.addColorStop(0, `hsla(${h},${s}%,${Math.min(l+15,100)}%,0)`);
-        g.addColorStop(0.5, `hsla(${h},${s}%,${l}%,${a})`);
-        g.addColorStop(1, `hsla(${h},${s}%,${Math.max(l-15,10)}%,0)`);
-
-        ctx.fillStyle = g;
-        ctx.fill();
-    }
-
-    function drawCurtain(ctx, layer, t) {
-        const { h, s, l, a, yC, curve, nF, nS, hght } = layer;
-        const step = 1; 
-        
-        for (let x = 0; x < W; x += step) {
-            const arcOffset = Math.sin((x / W) * Math.PI) * curve * H;
-            const baseNoise = (fbm(x * nF + t * nS, 3) - 0.5) * 0.15 * H;
-            const baseY = yC * H + arcOffset + baseNoise;
-
-            const pleatNoise = fbm(x * nF * 5 + t * nS * 4, 2); 
-            const alpha = a * (0.2 + 0.8 * pleatNoise);
-            const stripH = hght * H * (0.6 + 0.4 * pleatNoise);
-
-            const g = ctx.createLinearGradient(0, baseY, 0, baseY - stripH);
-            g.addColorStop(0, `hsla(${h},${s}%,${Math.min(l + 25, 100)}%,${alpha})`); 
-            g.addColorStop(0.15, `hsla(${h},${s}%,${l}%,${alpha * 0.9})`);
-            g.addColorStop(1, `hsla(${h},${s}%,${Math.max(l - 20, 10)}%,0)`);
-
-            ctx.fillStyle = g;
-            ctx.fillRect(x, baseY - stripH, step + 0.5, stripH);
-        }
-    }
-
-    function drawAurora(t){
-        ctxA.clearRect(0, 0, W, H);
-        ctxA.save();
-        ctxA.globalCompositeOperation = 'screen';
-        for(const layer of LAYERS_DARK) {
-            if (layer.type === 'cloud') drawCloudAurora(ctxA, layer, t);
-            else if (layer.type === 'arc') drawArc(ctxA, layer, t);
-            else if (layer.type === 'curtain') drawCurtain(ctxA, layer, t);
-        }
-        ctxA.restore();
-    }
-
-    // 5. إعداد وتحديث الـ Canvas
-    function resize() {
-        W = window.innerWidth; H = window.innerHeight;
-        [cBg, cAurora, cStars].forEach(c => { c.width = W; c.height = H; });
-        drawBg();
-        buildStars();
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    function loop(ts) {
-        drawStars(ts);
-        drawAurora(ts);
-        requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
+  function render(t) {
+    if (typeof ResizeObserver === "undefined") syncSize();
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (uTime) gl.uniform1f(uTime, t * 0.001);
+    if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
 }
