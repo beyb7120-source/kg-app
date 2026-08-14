@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora Glass Board - Knowledge Graph</title>
+<!-- Appwrite Web SDK -->
+<script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0/dist/iife/appwrite.js"></script>
+
+<style>
+/* =========================================
+   1. CORE & RESET
+========================================= */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root, [data-theme="dark"]{
+  --bg:#04080F;--text:#E6EDF3;--text-muted:#cbced2;--primary:#7C3AED;
+  --glass-bg:rgba(4,8,15,0.32);--glass-border:rgba(255,255,255,0.09);
+  --glass-shine:rgba(255,255,255,0.16);--shadow:rgba(0,0,0,0.65);
+  --grid:rgba(255,255,255,0.035);
+  --tag-bg:rgba(124,58,237,0.15);--tag-border:rgba(124,58,237,0.3);--tag-color:#A78BFA;
+  --conn:#E6EDF3;
+  --rel-implique: #E87A3E; --rel-prerequis: #64B5D6; --rel-partie: #94A3B8;
+  --rel-exemple: #84CC8A; --rel-defini: #C084FC; --rel-contraste: #F06C6A;
+}
+
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg)}
+
+#sky{position:fixed;inset:0;z-index:0;background:var(--bg)}
+#sky canvas{position:absolute;inset:0;width:100%;height:100%}
+
+/* =========================================
+   2. GRAPH BOARD
+========================================= */
+#board{position:fixed;inset:0;z-index:1;overflow:hidden;cursor:grab}
+#board.pan{cursor:grabbing}
+#canvas{position:absolute;width:4000px;height:3000px;top:0;left:0;transform-origin:0 0}
+#canvas::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:64px 64px;
+}
+
+.card{
+  position:absolute;width:275px;border-radius:20px;padding:22px 22px 18px;
+  cursor:grab;user-select:none;isolation:isolate;
+  background:var(--glass-bg);
+  backdrop-filter:blur(22px) saturate(1.9) brightness(1.06);
+  -webkit-backdrop-filter:blur(22px) saturate(1.9) brightness(1.06);
+  border:1.5px solid var(--glass-border);
+  box-shadow:0 20px 60px var(--shadow),0 2px 8px var(--shadow);
+  transition:box-shadow .25s,transform .2s,border-color .3s,background .3s;
+}
+.card::before{
+  content:'';position:absolute;inset:0;border-radius:inherit;z-index:0;
+  pointer-events:none;opacity:.55;mix-blend-mode:overlay;
+  background-size:256px 256px;
+}
+.card::after{
+  content:'';position:absolute;top:0;left:12%;right:12%;height:1.5px;
+  border-radius:99px;z-index:1;pointer-events:none;background:var(--glass-shine);opacity:.9;
+}
+.card:hover{transform:translateY(-4px) scale(1.015);border-color:rgba(255,255,255,.16)}
+.card.drag{cursor:grabbing;transform:scale(1.04) rotate(.7deg);
+  box-shadow:0 40px 100px var(--shadow),0 0 40px;
+  z-index:900!important;transition:none}
+.ci{position:relative;z-index:2}
+.icon{width:40px;height:40px;border-radius:12px;margin-bottom:14px;
+  display:flex;align-items:center;justify-content:center;font-size:19px;
+  background:var(--tag-bg);border:1px solid var(--tag-border)}
+.card h3{font-size:14.5px;font-weight:700;color:var(--text);margin-bottom:7px;letter-spacing:.01em}
+.card p{font-size:12.5px;color:var(--text-muted);line-height:1.65}
+.tag{display:inline-flex;align-items:center;gap:5px;margin-top:14px;
+  padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.05em;
+  background:var(--tag-bg);color:var(--tag-color);border:1px solid var(--tag-border)}
+
+#svg{position:absolute;inset:0;pointer-events:none;overflow:visible; z-index: 5;}
+.conn{fill:none;stroke-width:2.5;stroke-dasharray:7 5;opacity:.8; cursor: pointer; pointer-events: all; transition: stroke-width 0.2s;}
+.conn:hover { stroke-width: 4; opacity: 1; }
+
+/* =========================================
+   3. UI OVERLAYS (MODALS, LEGEND, CONTROLS)
+========================================= */
+.ui-layer { position: fixed; z-index: 1000; pointer-events: none; inset: 0; }
+.ui-element { pointer-events: auto; }
+
+/* Buttons */
+.btn { background: var(--glass-bg); border: 1px solid var(--glass-border); color: var(--text); padding: 10px 20px; border-radius: 99px; cursor: pointer; backdrop-filter: blur(10px); display: inline-flex; align-items: center; gap: 8px; transition: 0.2s; font-family: inherit;}
+.btn:hover { background: rgba(255,255,255,0.1); }
+.btn.primary { background: var(--primary); border-color: var(--primary); }
+.btn.primary:hover { background: #6D28D9; }
+
+/* Legend */
+#legend {
+  position: absolute; top: 20px; left: 20px; background: var(--glass-bg);
+  border: 1px solid var(--glass-border); padding: 15px; border-radius: 12px;
+  backdrop-filter: blur(15px); width: 220px;
+}
+.legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; color: var(--text); }
+.legend-item:last-child { margin-bottom: 0; }
+.legend-line { width: 20px; height: 3px; border-radius: 2px; }
+
+/* Top Actions */
+#top-actions { position: absolute; top: 20px; right: 20px; display: flex; gap: 10px; }
+
+/* Modals */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center; z-index: 2000;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.modal-backdrop.active { opacity: 1; pointer-events: auto; }
+.modal-content {
+  background: #0D1424; border: 1px solid var(--glass-border); padding: 25px;
+  border-radius: 16px; width: 90%; max-width: 500px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  color: var(--text); position: relative;
+}
+.modal-close { position: absolute; top: 15px; right: 15px; background: transparent; border: none; color: white; cursor: pointer; font-size: 20px;}
+.modal-content h2 { margin-bottom: 20px; font-size: 18px; }
+
+/* Inputs */
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; font-size: 13px; color: var(--text-muted); }
+.form-control {
+  width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border);
+  color: white; padding: 10px; border-radius: 8px; outline: none; font-family: inherit;
+}
+.form-control:focus { border-color: var(--primary); }
+textarea.form-control { resize: vertical; min-height: 100px; }
+
+/* Popup (Node/Edge Details) */
+#details-popup {
+  position: absolute; background: var(--glass-bg); backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); border-radius: 12px; padding: 15px; width: 300px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: none; z-index: 1001; pointer-events: auto;
+}
+#details-popup h4 { margin-bottom: 10px; color: var(--primary); }
+#details-popup p { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;}
+
+/* Source Viewer */
+#source-viewer {
+  position: fixed; top: 5%; left: 5%; right: 5%; bottom: 5%;
+  background: #0f172a; border: 1px solid var(--glass-border); border-radius: 16px;
+  z-index: 3000; display: none; flex-direction: column; box-shadow: 0 30px 60px rgba(0,0,0,0.9);
+}
+#source-viewer.active { display: flex; }
+.sv-header { padding: 15px 20px; border-bottom: 1px solid var(--glass-border); display: flex; justify-content: space-between; align-items: center; color: white;}
+.sv-content { flex: 1; padding: 20px; overflow-y: auto; color: #cbd5e1; font-size: 15px; line-height: 1.8; white-space: pre-wrap; }
+.highlight-quote { background: rgba(124, 58, 237, 0.4); padding: 2px 4px; border-radius: 4px; color: white; border: 1px solid var(--primary); }
+
+@media (max-width: 768px) {
+  #legend { display: none; } /* Hide legend on small screens */
+  #top-actions { bottom: 20px; top: auto; right: 50%; transform: translateX(50%); width: max-content; }
+}
+</style>
+</head>
+<body>
+
+<!-- 1. BACKGROUND -->
+<div id="sky">
+  <canvas id="cBg"></canvas>
+  <canvas id="cAurora"></canvas>
+  <canvas id="cStars"></canvas>
+</div>
+
+<!-- 2. GRAPH BOARD -->
+<div id="board">
+  <div id="canvas">
+    <svg id="svg"></svg>
+    <div id="nodes-container"></div>
+  </div>
+</div>
+
+<!-- 3. UI LAYER -->
+<div class="ui-layer">
+  
+  <!-- Legend -->
+  <div id="legend" class="ui-element">
+    <div class="legend-item"><div class="legend-line" style="background: var(--rel-implique);"></div> implique / mène à</div>
+    <div class="legend-item"><div class="legend-line" style="background: var(--rel-prerequis);"></div> prérequis de</div>
+    <div class="legend-item"><div class="legend-line" style="background: var(--rel-partie);"></div> fait partie de</div>
+    <div class="legend-item"><div class="legend-line" style="background: var(--rel-exemple);"></div> exemple de</div>
+    <div class="legend-item"><div class="legend-line" style="background: var(--rel-defini);"></div> défini par</div>
+    <div class="legend-item"><div class="legend-line" style="background: var(--rel-contraste);"></div> contraste avec</div>
+  </div>
+
+  <!-- Top Actions -->
+  <div id="top-actions" class="ui-element">
+    <button class="btn" onclick="UIManager.openUploadModal()">➕ Ajouter une source</button>
+    <button class="btn primary" onclick="AppEngine.generateGraph()">🧠 Générer Graph</button>
+    <button class="btn" onclick="AppEngine.saveToAppwrite()">💾 Sauvegarder (Appwrite)</button>
+  </div>
+
+  <!-- Popup Details (Ai Explanation) -->
+  <div id="details-popup" class="ui-element">
+    <h4 id="dp-title">Raisonnement AI</h4>
+    <p id="dp-desc">L'explication de l'IA apparaîtra ici...</p>
+    <button class="btn primary" style="width: 100%; justify-content: center;" onclick="UIManager.viewInSource()">🔍 View in source</button>
+  </div>
+</div>
+
+<!-- 4. MODALS -->
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal-backdrop">
+  <div class="modal-content ui-element">
+    <button class="modal-close" onclick="UIManager.closeUploadModal()">×</button>
+    <h2>Ajouter une source & Configuration</h2>
+    
+    <div class="form-group">
+      <label>Clé API (Gemini / OpenAI)</label>
+      <input type="password" id="api-key" class="form-control" placeholder="Entrez votre clé API...">
+    </div>
+
+    <div class="form-group">
+      <label>Sources (Texte copié)</label>
+      <textarea id="source-text" class="form-control" placeholder="Collez votre texte académique ici..."></textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button class="btn" onclick="document.getElementById('file-upload').click()">📁 Télécharger (PC)</button>
+      <input type="file" id="file-upload" style="display: none;" multiple accept=".txt,.json">
+      <button class="btn primary" onclick="UIManager.addSource()" style="margin-right: auto;">Ajouter au contexte</button>
+    </div>
+    
+    <div id="sources-list" style="margin-top: 15px; font-size: 12px; color: var(--text-muted);">
+      Sources prêtes: 0
+    </div>
+  </div>
+</div>
+
+<!-- Source Viewer -->
+<div id="source-viewer" class="ui-element">
+  <div class="sv-header">
+    <h3>Source Document</h3>
+    <button class="btn" onclick="UIManager.closeSourceViewer()">Fermer</button>
+  </div>
+  <div class="sv-content" id="sv-content-box">
+    <!-- Text with highlights will go here -->
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   MODULE 1: CONFIG & APPWRITE SERVICE
+========================================================================= */
+const Config = {
+  appwriteEndpoint: 'https://cloud.appwrite.io/v1',
+  appwriteProjectId: 'YOUR_PROJECT_ID',
+  appwriteDbId: '6a6682d6000846a6685e',
+  appwriteCollectionId: 'kg-app',
+  
+  systemInstruction: `
+Tu es un module de LECTURE et de STRUCTURATION de texte académique. Rien d'autre.
+RÈGLES STRICTES :
+1. Ta seule tâche est de nettoyer et segmenter le texte fourni en sections cohérentes.
+   Tu N'IDENTIFIES PAS de concepts, tu NE CRÉES PAS de relations. Ce n'est pas ton rôle.
+2. Ne reformule JAMAIS le contenu scientifique. Ne résume pas. Ne simplifie pas.
+3. N'AJOUTE aucune information, exemple ou explication qui ne serait pas déjà dans le texte source.
+4. Préserve la langue originale du document. Ne traduis rien.
+5. Découpe en sections logiques. Donne à chaque section un id court stable (ex: "s1", "s2") et un titre bref.
+6. Ignore les portions de texte illisibles.
+
+EXTRACTION DES CONCEPTS ET RELATIONS (JSON SEULEMENT):
+En plus de la structuration, tu dois extraire les concepts et les relations au format JSON strict.
+Types de relations autorisés : "implique", "prerequis", "partie", "exemple", "defini", "contraste".
+Pour chaque noeud et relation, donne le 'reasoning' (pourquoi tu l'as créé) et la citation 'quote' exacte du texte.
+Format attendu:
+{
+  "nodes": [{ "id": "n1", "label": "Concept", "description": "...", "reasoning": "...", "quote": "..." }],
+  "edges": [{ "source": "n1", "target": "n2", "type": "implique", "reasoning": "...", "quote": "..." }]
+}`
+};
+
+const DBService = {
+  client: null, databases: null,
+  init() {
+    if(!window.Appwrite) return console.warn("Appwrite SDK not loaded");
+    this.client = new Appwrite.Client()
+      .setEndpoint(Config.appwriteEndpoint)
+      .setProject(Config.appwriteProjectId);
+    this.databases = new Appwrite.Databases(this.client);
+  },
+  async saveGraph(data) {
+    if(!this.databases) return alert("Appwrite non configuré.");
+    try {
+      await this.databases.createDocument(
+        Config.appwriteDbId, 
+        Config.appwriteCollectionId, 
+        Appwrite.ID.unique(), 
+        {
+          userId: 'user_123',
+          title: 'Graph généré',
+          graphData: JSON.stringify(data)
+        }
+      );
+      alert("Graph sauvegardé avec succès dans Appwrite !");
+    } catch (e) {
+      console.error(e);
+      alert("Erreur de sauvegarde: " + e.message);
+    }
+  }
+};
+DBService.init();
+
+/* =========================================================================
+   MODULE 2: AI SERVICE (REAL GEMINI API INTEGRATION)
+========================================================================= */
+const AIService = {
+  async fetchGraphData(apiKey, sourcesText) {
+    if(!apiKey) throw new Error("Clé API manquante. Veuillez entrer votre clé Gemini.");
+    
+    // واجهة برمجة تطبيقات Gemini (تأكد من اختيار الموديل المناسب، هنا استعملنا gemini-1.5-flash لسرعته)
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    const payload = {
+      contents: [{
+        parts: [{ text: `${Config.systemInstruction}\n\nVOICI LE TEXTE SOURCE:\n${sourcesText}` }]
+      }],
+      generationConfig: {
+        response_mime_type: "application/json", // باش نضمنو أن الرد يكون JSON
+      }
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || "Erreur lors de la communication avec l'API Gemini.");
+      }
+
+      const data = await response.json();
+      
+      // استخراج النص من رد Gemini
+      const rawText = data.candidates[0].content.parts[0].text;
+      
+      // تحويل النص إلى كائن JSON
+      const graphData = JSON.parse(rawText);
+      
+      // تحقق بسيط من البنية
+      if (!graphData.nodes || !graphData.edges) {
+          throw new Error("L'API n'a pas renvoyé la structure JSON attendue (nodes et edges).");
+      }
+
+      return graphData;
+
+    } catch (error) {
+      console.error("Erreur détaillée AIService:", error);
+      throw error;
+    }
+  }
+};
+
+/* =========================================================================
+   MODULE 3: GRAPH ENGINE
+========================================================================= */
+const GraphEngine = {
+  data: { nodes: [], edges: [], sourceText: "" },
+  nodesContainer: document.getElementById('nodes-container'),
+  svgEl: document.getElementById('svg'),
+  boardEl: document.getElementById('board'),
+  cEls: {},
+  pan: {x: innerWidth/2 - 500, y: innerHeight/2 - 300}, 
+  scale: 0.9,
+  maxZ: 20,
+  
+  getColorForType(type) {
+    const colors = {
+      'implique': 'var(--rel-implique)', 'prerequis': 'var(--rel-prerequis)',
+      'partie': 'var(--rel-partie)', 'exemple': 'var(--rel-exemple)',
+      'defini': 'var(--rel-defini)', 'contraste': 'var(--rel-contraste)'
+    };
+    return colors[type] || 'var(--conn)';
+  },
+
+  render(graphData) {
+    this.data.nodes = graphData.nodes;
+    this.data.edges = graphData.edges;
+    this.nodesContainer.innerHTML = '';
+    this.cEls = {};
+
+    this.data.nodes.forEach((n, i) => {
+      n.x = 200 + (i * 350) % 1200;
+      n.y = 150 + Math.floor(i / 3) * 300;
+      
+      const el = document.createElement('div');
+      el.className = 'card'; el.id = n.id;
+      el.style.cssText = `left:${n.x}px;top:${n.y}px;z-index:10`;
+      el.innerHTML = `
+        <div class="ci">
+          <h3>${n.label}</h3>
+          <p>${n.description}</p>
+        </div>`;
+      
+      el.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        UIManager.showPopup(e.clientX, e.clientY, n.label, n.reasoning, n.quote);
+      });
+
+      this.nodesContainer.appendChild(el);
+      this.cEls[n.id] = el;
+      this.makeDrag(el, n);
+    });
+
+    this.drawLines();
+    this.applyX();
+  },
+
+  drawLines() {
+    this.svgEl.innerHTML = '';
+    this.data.edges.forEach(e => {
+      const f = this.cEls[e.source];
+      const t = this.cEls[e.target];
+      if(!f || !t) return;
+
+      const fx = parseFloat(f.style.left) + f.offsetWidth / 2;
+      const fy = parseFloat(f.style.top) + f.offsetHeight / 2;
+      const tx = parseFloat(t.style.left) + t.offsetWidth / 2;
+      const ty = parseFloat(t.style.top) + t.offsetHeight / 2;
+      const mx = (fx + tx) / 2;
+
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', `M${fx},${fy} C${mx},${fy} ${mx},${ty} ${tx},${ty}`);
+      p.setAttribute('class', 'conn');
+      p.style.stroke = this.getColorForType(e.type);
+      
+      p.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        UIManager.showPopup(ev.clientX, ev.clientY, `Relation: ${e.type}`, e.reasoning, e.quote);
+      });
+
+      this.svgEl.appendChild(p);
+    });
+  },
+
+  makeDrag(el, d) {
+    let on = false, ox = 0, oy = 0;
+    const s = (cx, cy) => {
+      on = true; this.maxZ++; el.style.zIndex = this.maxZ;
+      const br = this.boardEl.getBoundingClientRect();
+      ox = (cx - br.left - this.pan.x) / this.scale - parseFloat(el.style.left);
+      oy = (cy - br.top - this.pan.y) / this.scale - parseFloat(el.style.top);
+      el.classList.add('drag');
+    };
+    const m = (cx, cy) => {
+      if (!on) return;
+      const br = this.boardEl.getBoundingClientRect();
+      el.style.left = ((cx - br.left - this.pan.x) / this.scale - ox) + 'px';
+      el.style.top = ((cy - br.top - this.pan.y) / this.scale - oy) + 'px';
+      d.x = parseFloat(el.style.left); d.y = parseFloat(el.style.top);
+      this.drawLines();
+    };
+    const e_end = () => { on = false; el.classList.remove('drag'); };
+
+    el.addEventListener('mousedown', ev => { if(ev.button)return; ev.stopPropagation(); s(ev.clientX, ev.clientY); ev.preventDefault(); });
+    document.addEventListener('mousemove', ev => m(ev.clientX, ev.clientY));
+    document.addEventListener('mouseup', e_end);
+  },
+
+  initBoard() {
+    let pp = false, ps = {x:0, y:0}, po = {x:0, y:0};
+    this.boardEl.addEventListener('mousedown', ev => {
+      if (ev.target.closest('.card') || ev.target.closest('.conn')) return;
+      pp = true; this.boardEl.classList.add('pan');
+      ps = {x: ev.clientX, y: ev.clientY}; po = {...this.pan};
+      UIManager.closePopup(); 
+    });
+    document.addEventListener('mousemove', ev => {
+      if (!pp) return;
+      this.pan.x = po.x + (ev.clientX - ps.x); this.pan.y = po.y + (ev.clientY - ps.y);
+      this.applyX();
+    });
+    document.addEventListener('mouseup', () => { pp = false; this.boardEl.classList.remove('pan'); });
+
+    this.boardEl.addEventListener('wheel', ev => {
+      ev.preventDefault();
+      const d2 = ev.deltaY > 0 ? 0.92 : 1.08;
+      const ns = Math.min(2.4, Math.max(0.22, this.scale * d2));
+      const br = this.boardEl.getBoundingClientRect();
+      const mx = ev.clientX - br.left, my = ev.clientY - br.top;
+      this.pan.x = mx - (mx - this.pan.x) * (ns / this.scale);
+      this.pan.y = my - (my - this.pan.y) * (ns / this.scale);
+      this.scale = ns; this.applyX();
+    }, {passive: false});
+    
+    this.applyX();
+  },
+
+  applyX() {
+    document.getElementById('canvas').style.transform = `translate(${this.pan.x}px,${this.pan.y}px) scale(${this.scale})`;
+  }
+};
+GraphEngine.initBoard();
+
+/* =========================================================================
+   MODULE 4: UI MANAGER & APP LOGIC
+========================================================================= */
+const UIManager = {
+  sources: [],
+  currentQuote: "",
+
+  openUploadModal() { document.getElementById('upload-modal').classList.add('active'); },
+  closeUploadModal() { document.getElementById('upload-modal').classList.remove('active'); },
+  
+  addSource() {
+    const text = document.getElementById('source-text').value;
+    if(text.trim() !== "") {
+      this.sources.push(text);
+      document.getElementById('sources-list').innerText = `Sources prêtes: ${this.sources.length}`;
+      document.getElementById('source-text').value = '';
+    }
+  },
+
+  showPopup(x, y, title, desc, quote) {
+    const p = document.getElementById('details-popup');
+    document.getElementById('dp-title').innerText = title;
+    document.getElementById('dp-desc').innerText = desc || "Aucune explication fournie.";
+    this.currentQuote = quote;
+    
+    p.style.display = 'block';
+    p.style.left = Math.min(x + 15, window.innerWidth - 320) + 'px';
+    p.style.top = Math.min(y + 15, window.innerHeight - 200) + 'px';
+  },
+  
+  closePopup() { document.getElementById('details-popup').style.display = 'none'; },
+
+  viewInSource() {
+    if(!this.sources.length) return alert("Aucune source originale n'est chargée.");
+    this.closePopup();
+    const sv = document.getElementById('source-viewer');
+    const contentBox = document.getElementById('sv-content-box');
+    
+    let fullText = this.sources.join('\n\n---\n\n');
+    
+    if(this.currentQuote && fullText.includes(this.currentQuote)) {
+      const escapedQuote = this.currentQuote.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(${escapedQuote})`, 'g');
+      contentBox.innerHTML = fullText.replace(regex, `<span class="highlight-quote">$1</span>`);
+    } else {
+      contentBox.innerText = fullText;
+    }
+    
+    sv.classList.add('active');
+  },
+
+  closeSourceViewer() { document.getElementById('source-viewer').classList.remove('active'); }
+};
+
+const AppEngine = {
+  async generateGraph() {
+    const apiKey = document.getElementById('api-key').value;
+    if(!apiKey) return alert("Veuillez entrer une clé API d'abord.");
+    if(UIManager.sources.length === 0) return alert("Veuillez ajouter au moins une source.");
+    
+    UIManager.closeUploadModal();
+    const btn = document.querySelector('#top-actions .btn.primary');
+    btn.innerText = "⏳ Génération...";
+    
+    try {
+      const fullText = UIManager.sources.join('\n');
+      const graphData = await AIService.fetchGraphData(apiKey, fullText);
+      GraphEngine.render(graphData);
+    } catch (e) {
+      alert("Erreur lors de la génération: " + e.message);
+    } finally {
+      btn.innerText = "🧠 Générer Graph";
+    }
+  },
+
+  saveToAppwrite() {
+    if(GraphEngine.data.nodes.length === 0) return alert("Graph vide. Générez-le d'abord.");
+    DBService.saveGraph(GraphEngine.data);
+  }
+};
+
+/* =========================================================================
+   MODULE 5: BACKGROUND ANIMATION (Original Aurora Code - UNTOUCHED)
+========================================================================= */
+const perm=(()=>{
+  const p=new Uint8Array(512);
+  const base=[...Array(256)].map((_,i)=>i);
+  for(let i=255;i>0;i--){const j=Math.random()*(i+1)|0;[base[i],base[j]]=[base[j],base[i]];}
+  for(let i=0;i<512;i++) p[i]=base[i&255];
+  return p;
+})();
+
+function fade(t){return t*t*t*(t*(t*6-15)+10);}
+function lerp(a,b,t){return a+t*(b-a);}
+function grad1D(h,x){return(h&1)?x:-x;}
+
+function noise1(x){
+  const xi=Math.floor(x)&255;
+  const xf=x-Math.floor(x);
+  const u=fade(xf);
+  return lerp(grad1D(perm[xi],xf), grad1D(perm[xi+1],xf-1), u);
+}
+
+function fbm(x, octs=4){
+  let v=0,amp=.5,freq=1,max=0;
+  for(let i=0;i<octs;i++){v+=noise1(x*freq)*amp;max+=amp;amp*=.5;freq*=2.1;}
+  return v/max;
+}
+
+const cBg     = document.getElementById('cBg');
+const cAurora = document.getElementById('cAurora');
+const cStars  = document.getElementById('cStars');
+const ctxBg   = cBg.getContext('2d');
+const ctxA    = cAurora.getContext('2d');
+const ctxS    = cStars.getContext('2d');
+
+let W=0, H=0;
+function resize(){
+  W = window.innerWidth; H = window.innerHeight;
+  [cBg,cAurora,cStars].forEach(c=>{c.width=W;c.height=H;});
+  drawBg();
+  buildStars();
+}
+window.addEventListener('resize', resize);
+
+function drawBg(){
+  ctxBg.clearRect(0,0,W,H);
+  const g=ctxBg.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,   '#04080F');
+  g.addColorStop(0.55,'#060C18');
+  g.addColorStop(0.80,'#0A1628');
+  g.addColorStop(1,   '#0D1F35');
+  ctxBg.fillStyle=g; ctxBg.fillRect(0,0,W,H);
+}
+
+let stars=[];
+function buildStars(){
+  stars=[];
+  const n = 320; 
+  for(let i=0; i<n; i++){
+    stars.push({
+      x: Math.random(), 
+      y: Math.random() * .85,
+      r: Math.random() * 1.1 + .2, 
+      a: Math.random() * .5 + .45,
+      sp: Math.random() * .011 + .003, 
+      ph: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function drawStars(t){
+  ctxS.clearRect(0,0,W,H);
+  for(const s of stars){
+    const pulse = Math.sin(t*s.sp+s.ph)*.35+.65;
+    const al = s.a * pulse;
+    const sx = s.x * W, sy = s.y * H;
+    ctxS.beginPath(); ctxS.arc(sx,sy,s.r,0,Math.PI*2);
+    ctxS.fillStyle=`rgba(255,255,255,${al})`;
+    ctxS.fill();
+  }
+}
+
+const LAYERS_DARK = [
+  { type: 'cloud',   h: 160, s: 90, l: 30, a: 0.15, x: 0.2, y: 0.4, r: 0.5, nF: 0.001, nS: 0.00002 },
+  { type: 'cloud',   h: 210, s: 80, l: 35, a: 0.12, x: 0.8, y: 0.5, r: 0.6, nF: 0.002, nS: 0.00003 },
+  { type: 'arc',     h: 170, s: 90, l: 45, a: 0.5,  yC: 0.6, curve: -0.15, nF: 0.0015, nS: 0.00003, thick: 0.12 },
+  { type: 'curtain', h: 145, s: 100, l: 65, a: 0.85, yC: 0.65, curve: 0.1,  nF: 0.002, nS: 0.00006, hght: 0.4 },
+  { type: 'curtain', h: 155, s: 100, l: 75, a: 0.95, yC: 0.55, curve: -0.05, nF: 0.003, nS: 0.00008, hght: 0.3 }
+];
+
+function drawCloudAurora(ctx, layer, t) {
+  const { h, s, l, a, x, y, r, nF, nS } = layer;
+  const nx = (x + fbm(t * nS, 2) * 0.2 - 0.1) * W;
+  const ny = (y + fbm(t * nS + 10, 2) * 0.2 - 0.1) * H;
+  const rad = r * Math.min(W, H) * (0.8 + 0.4 * fbm(t * nS * 2, 2));
+  const g = ctx.createRadialGradient(nx, ny, 0, nx, ny, rad);
+  g.addColorStop(0, `hsla(${h},${s}%,${l}%,${a})`);
+  g.addColorStop(1, `hsla(${h},${s}%,${l}%,0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(nx, ny, rad, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawArc(ctx, layer, t) {
+  const { h, s, l, a, yC, curve, nF, nS, thick } = layer;
+  const PTS = 80;
+  const dx = W / (PTS - 1);
+  const topY = [], botY = [];
+  for (let i = 0; i < PTS; i++) {
+    const x = i * dx;
+    const arcOffset = Math.sin((x / W) * Math.PI) * curve * H;
+    const noise = (fbm(x * nF + t * nS, 3) - 0.5) * 0.15 * H;
+    const cy = yC * H + arcOffset + noise;
+    const hs = thick * H * 0.5;
+    topY.push(cy - hs);
+    botY.push(cy + hs);
+  }
+  ctx.beginPath();
+  ctx.moveTo(0, topY[0]);
+  for (let i = 0; i < PTS - 1; i++) {
+    const cpx = (i * dx + (i + 1) * dx) * 0.5;
+    const cpy = (topY[i] + topY[i + 1]) * 0.5;
+    ctx.quadraticCurveTo(i * dx, topY[i], cpx, cpy);
+  }
+  ctx.lineTo(W, topY[PTS - 1]);
+  ctx.lineTo(W, botY[PTS - 1]);
+  for (let i = PTS - 2; i >= 0; i--) {
+    const cpx = (i * dx + (i + 1) * dx) * 0.5;
+    const cpy = (botY[i] + botY[i + 1]) * 0.5;
+    ctx.quadraticCurveTo((i + 1) * dx, botY[i + 1], cpx, cpy);
+  }
+  ctx.lineTo(0, botY[0]);
+  ctx.closePath();
+  const avgCy = topY[Math.floor(PTS/2)] + (botY[0]-topY[0])*.5;
+  const g = ctx.createLinearGradient(0, avgCy - thick * H * 0.5, 0, avgCy + thick * H * 0.5);
+  g.addColorStop(0, `hsla(${h},${s}%,${Math.min(l+15,100)}%,0)`);
+  g.addColorStop(0.5, `hsla(${h},${s}%,${l}%,${a})`);
+  g.addColorStop(1, `hsla(${h},${s}%,${Math.max(l-15,10)}%,0)`);
+  ctx.fillStyle = g;
+  ctx.fill();
+}
+
+function drawCurtain(ctx, layer, t) {
+  const { h, s, l, a, yC, curve, nF, nS, hght } = layer;
+  const step = 1; 
+  for (let x = 0; x < W; x += step) {
+    const arcOffset = Math.sin((x / W) * Math.PI) * curve * H;
+    const baseNoise = (fbm(x * nF + t * nS, 3) - 0.5) * 0.15 * H;
+    const baseY = yC * H + arcOffset + baseNoise;
+    const pleatNoise = fbm(x * nF * 5 + t * nS * 4, 2); 
+    const alpha = a * (0.2 + 0.8 * pleatNoise);
+    const stripH = hght * H * (0.6 + 0.4 * pleatNoise);
+    const g = ctx.createLinearGradient(0, baseY, 0, baseY - stripH);
+    g.addColorStop(0, `hsla(${h},${s}%,${Math.min(l + 25, 100)}%,${alpha})`); 
+    g.addColorStop(0.15, `hsla(${h},${s}%,${l}%,${alpha * 0.9})`);
+    g.addColorStop(1, `hsla(${h},${s}%,${Math.max(l - 20, 10)}%,0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, baseY - stripH, step + 0.5, stripH);
+  }
+}
+
+function drawAurora(t){
+  ctxA.clearRect(0,0,W,H);
+  ctxA.save();
+  ctxA.globalCompositeOperation = 'screen';
+  for(const layer of LAYERS_DARK) {
+    if (layer.type === 'cloud') drawCloudAurora(ctxA, layer, t);
+    else if (layer.type === 'arc') drawArc(ctxA, layer, t);
+    else if (layer.type === 'curtain') drawCurtain(ctxA, layer, t);
+  }
+  ctxA.restore();
+}
+
+function loop(ts){
+  drawStars(ts);
+  drawAurora(ts);
+  requestAnimationFrame(loop);
+}
+
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
