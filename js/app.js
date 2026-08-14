@@ -21,17 +21,17 @@ import { showToast, initThemeToggle } from "./ui.js";
 const { Client, Account, Databases, Teams, Permission, Role, Query, ID } = window.Appwrite;
 const client = new Client()
     .setEndpoint('https://fra.cloud.appwrite.io/v1')
-    .setProject('6a667fe600130a273954');
+    .setProject('6a667fe600130a27395'); /* 6a667fe600130a273954 */
 
 const account = new Account(client);
 const databases = new Databases(client);
 const teams = new Teams(client);
 
-const DATABASE_ID = '6a6682d6000846a6685e';
-const COLLECTION_ID = 'kg-app';
-const GRAPH_META_COLLECTION_ID = 'graph-meta';
-const ACCESS_REQUESTS_COLLECTION_ID = 'access-requests';
-
+const DATABASE_ID = '6a6682d6000846a6685'; /* 6a6682d6000846a6685e */
+const COLLECTION_ID = 'kg-ap'; /* kg-app */
+const GRAPH_META_COLLECTION_ID = 'graph-met'; /* graph-meta */
+const ACCESS_REQUESTS_COLLECTION_ID = 'access-request';  /* access-requests */
+ 
 function teamIdFor(id) { return "t_" + id; }
 
 // ============================================================
